@@ -89,6 +89,9 @@ public class Db
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             INSERT OR IGNORE INTO meta (key, value) VALUES ('database_id', lower(hex(randomblob(8))));
             """);
+        // Borttagna recept (se RemoveNotDinners) ligger kvar med removed = 1, så att deras id aldrig återanvänds.
+        if (!Query(c, "PRAGMA table_info(recipes)", [], r => r.GetString(1)).Contains("removed"))
+            Exec(c, "ALTER TABLE recipes ADD COLUMN removed INTEGER NOT NULL DEFAULT 0");
         DatabaseId = (string)Scalar(c, "SELECT value FROM meta WHERE key = 'database_id'", [])!;
     }
 
@@ -147,7 +150,7 @@ public class Db
     public (Card[] Recipes, bool More) Recipes(long after, int limit)
     {
         using var c = Open();
-        var list = Query(c, $"SELECT {CardColumns} FROM recipes WHERE id > $after ORDER BY id LIMIT $limit",
+        var list = Query(c, $"SELECT {CardColumns} FROM recipes WHERE id > $after AND removed = 0 ORDER BY id LIMIT $limit",
             new() { ["$after"] = after, ["$limit"] = limit + 1 }, ReadCard);
         return (list.Take(limit).ToArray(), list.Count > limit);
     }
@@ -158,14 +161,40 @@ public class Db
         using var c = Open();
         return Convert.ToInt32(Scalar(c, """
             SELECT COUNT(*) FROM recipes r
-            WHERE (SELECT COUNT(*) FROM kv WHERE key IN ('swipe/a/' || r.id, 'swipe/b/' || r.id) AND value != 'null') < 2
+            WHERE r.removed = 0
+              AND (SELECT COUNT(*) FROM kv WHERE key IN ('swipe/a/web-' || r.id, 'swipe/b/web-' || r.id) AND value != 'null') < 2
             """, []));
+    }
+
+    /// <summary>
+    /// Tar bort recept som inte ser ut som middag (t.ex. tårtor som kom med innan filtret blev bättre). Telefonerna har redan
+    /// hämtat dem, så servern sparar också hidden/web-&lt;id&gt; = true, som synkas ut och tar bort dem ur leken där.
+    /// </summary>
+    public int RemoveNotDinners()
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        var ids = Query(c, "SELECT id, title, description FROM recipes WHERE removed = 0", [],
+                r => (Id: r.GetInt64(0), Title: r.GetString(1), Description: r.IsDBNull(2) ? null : r.GetString(2)))
+            .Where(r => !Classifier.LooksLikeDinner(r.Title, r.Description)).Select(r => r.Id).ToArray();
+        var seq = Convert.ToInt64(Scalar(c, "SELECT COALESCE(MAX(seq), 0) FROM kv", []));
+        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        foreach (var id in ids)
+        {
+            Exec(c, "UPDATE recipes SET removed = 1 WHERE id = $id", new() { ["$id"] = id });
+            Exec(c, """
+                INSERT INTO kv (key, value, updated_at, device, seq) VALUES ($key, 'true', $at, 'server', $seq)
+                ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, device = excluded.device, seq = excluded.seq
+                """, new() { ["$key"] = $"hidden/web-{id}", ["$at"] = now, ["$seq"] = ++seq });
+        }
+        tx.Commit();
+        return ids.Length;
     }
 
     public Dictionary<string, int> CountBySource()
     {
         using var c = Open();
-        return Query(c, "SELECT source, COUNT(*) FROM recipes GROUP BY source", [], r => (r.GetString(0), r.GetInt32(1)))
+        return Query(c, "SELECT source, COUNT(*) FROM recipes WHERE removed = 0 GROUP BY source", [], r => (r.GetString(0), r.GetInt32(1)))
             .ToDictionary(x => x.Item1, x => x.Item2);
     }
 

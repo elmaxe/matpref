@@ -96,4 +96,23 @@ public sealed class ImporterTests : IDisposable
         Assert.Equal(["Koka vatten.", "Rör i havre."], porridge.Steps!);
         Assert.Empty(db.Recipes(0, 10).Recipes);
     }
+
+    [Theory]
+    [InlineData("Sommardröm med mandelmaräng och färska bär", "Rosa mandelmarängbottnar, grädde och bär i en enkel sommartårta.")]
+    [InlineData("Morotskaka med frosting", null)]
+    [InlineData("Pavlova med passionsfrukt", null)]
+    [InlineData("Jordgubbar med vaniljkräm", "En somrig efterrätt.")]
+    [InlineData("Havrekakor", "Gott till kaffet.")]
+    public void Desserts_are_not_dinner(string title, string? description) => Assert.False(Classifier.LooksLikeDinner(title, description));
+
+    [Theory]
+    [InlineData("Pannkakor med fläsk", null)]
+    [InlineData("Fiskkakor med remouladsås", null)]
+    [InlineData("Kycklinggryta med ris", "En specifikt god gryta till vardags.")]
+    [InlineData("Ugnsbakad lax", "Servera med potatis.")]
+    public void Dinners_stay(string title, string? description) => Assert.True(Classifier.LooksLikeDinner(title, description));
+
+    [Fact]
+    public void Sweet_keywords_are_not_dinner() =>
+        Assert.False(Classifier.IsDinner(new RecipeMeta("https://x.se/r/", "Sommardröm", null, null, 60, 8, ["Fest"], ["Tårta", "Sommar"])));
 }

@@ -301,6 +301,20 @@ export function ServerPanel({ store, syncer }: { store: Store; syncer: Syncer })
   const saved = store.meta.server
   const changed = normalizeUrl(url) !== saved.url || token.trim() !== saved.token
   const pending = store.dirtyEntries().length
+  const [copied, setCopied] = useState(false)
+  const versionText = [
+    `Appen: ${appVersion.version}${built(appVersion)}`,
+    ...(isConfigured(saved) ? [`Servern: ${status.server ? `${status.server.version}${built(status.server)}` : 'okänd'}`] : []),
+  ].join('\n')
+  const copyVersions = async () => {
+    try {
+      await navigator.clipboard.writeText(versionText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setInfo('Kunde inte kopiera. Markera texten och kopiera den i stället.')
+    }
+  }
 
   const save = async () => {
     const clean = normalizeUrl(url)
@@ -373,15 +387,16 @@ export function ServerPanel({ store, syncer }: { store: Store; syncer: Syncer })
       )}
       {info && <p className="meta">{info}</p>}
       <p className="meta versions">
-        Appen: {appVersion.version}
-        {built(appVersion)}
-        {isConfigured(saved) && (
-          <>
-            <br />
-            Servern: {status.server ? `${status.server.version}${built(status.server)}` : 'okänd'}
-          </>
-        )}
+        {versionText.split('\n').map((line, i) => (
+          <span key={i}>
+            {i > 0 && <br />}
+            {line}
+          </span>
+        ))}
       </p>
+      <button className="link-btn muted" onClick={copyVersions}>
+        {copied ? 'Kopierat' : 'Kopiera versionerna'}
+      </button>
     </div>
   )
 }

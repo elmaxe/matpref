@@ -34,6 +34,12 @@ describe('kortleken', () => {
     expect(ids(phone('a').deck(pool, 'storkok'))).toEqual(['web-2'])
   })
 
+  it('hoppar över recept som servern har tagit bort', () => {
+    const a = phone('a')
+    a.applyRemote([{ key: 'hidden/web-2', value: true, updatedAt: Date.now(), device: 'server' }])
+    expect(ids(a.deck(pool))).toEqual(['web-4', 'web-1', 'web-3'])
+  })
+
   it('visar först det den andra gillat och hoppar över det den andra sagt nej till', () => {
     const a = phone('a')
     const b = phone('b')
