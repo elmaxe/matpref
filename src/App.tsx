@@ -51,7 +51,11 @@ export default function App({ store, syncer }: { store: Store; syncer: Syncer })
     if (location.hash.startsWith('#import=')) history.replaceState(null, '', location.pathname + location.search)
   }, [])
 
-  useEffect(() => window.scrollTo(0, 0), [tab])
+  // Inga pilfunktioner utan klamrar här: nyare Chrome låter scrollTo returnera ett Promise, och React tror då att det
+  // är en städfunktion och kraschar när fliken byts.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [tab])
 
   const rollFrom = (source: Filters['source']) => {
     setFilters({ ...filters, source })
