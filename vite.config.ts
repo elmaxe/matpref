@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -7,8 +8,22 @@ const base = process.env.BASE_PATH ?? '/'
 // Sätts när en PR-förhandsvisning byggs, se .github/workflows/preview.yml.
 const preview = process.env.VITE_PREVIEW_LABEL
 
+// Appens version: commitens korta hash (GitHub Actions sätter GITHUB_SHA), annars den lokala, annars "dev".
+function commit() {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7)
+  try {
+    return execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    return 'dev'
+  }
+}
+
 export default defineConfig({
   base,
+  define: {
+    __APP_VERSION__: JSON.stringify(commit()),
+    __APP_BUILT__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({

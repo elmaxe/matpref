@@ -136,6 +136,8 @@ public sealed class ApiTests : IDisposable
         using var factory = Factory(token: "hemlig");
         var client = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/health")).StatusCode);
+        // Dockers health check skickar ingen nyckel.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/healthz")).StatusCode);
 
         var req = new HttpRequestMessage(HttpMethod.Get, "/api/health");
         req.Headers.Add("X-Matpref-Token", "hemlig");
@@ -152,5 +154,19 @@ public sealed class ApiTests : IDisposable
         var pre = await client.SendAsync(preflight);
         Assert.True(pre.IsSuccessStatusCode);
         Assert.Equal("true", pre.Headers.GetValues("Access-Control-Allow-Private-Network").Single());
+    }
+
+    [Fact]
+    public async Task Version_is_dev_unless_the_image_sets_it()
+    {
+        var dev = await _client.GetFromJsonAsync<JsonElement>("/api/version");
+        Assert.Equal("dev", dev.GetProperty("version").GetString());
+
+        using var factory = Factory().WithWebHostBuilder(b => b
+            .UseSetting("MATPREF_VERSION", "3baefba")
+            .UseSetting("MATPREF_BUILT", "2026-10-18T19:14:13Z"));
+        var res = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/api/version");
+        Assert.Equal("3baefba", res.GetProperty("version").GetString());
+        Assert.Equal("2026-10-18T19:14:13Z", res.GetProperty("built").GetString());
     }
 }

@@ -70,6 +70,15 @@ async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Pro
 
 export const health = (s: ServerSettings) => call<Health>(s, '/health')
 
+export interface Version {
+  /** Commitens korta hash, eller "dev". */
+  version: string
+  built?: string | null
+}
+
+/** Appens egen version, satt när den byggdes. */
+export const appVersion: Version = { version: __APP_VERSION__, built: __APP_BUILT__ }
+
 const toWebRecipe = (c: Card): WebRecipe => ({ ...c, id: webKey(c.id) })
 
 /** Gör om ett recept från nätet till ett vanligt recept, så att det kan slumpas, gillas och bli favorit som de andra. */
@@ -88,6 +97,10 @@ export const toRecipe = (r: WebRecipe): Recipe => ({
 export interface SyncStatus {
   state: 'off' | 'syncing' | 'ok' | 'error'
   message?: string
+  /** Om senaste synken nådde servern. Ligger kvar medan nästa synk pågår, så att statusen inte blinkar. */
+  connected?: boolean
+  /** Serverns version, från senaste lyckade synken. */
+  server?: Version
 }
 
 /** Synkar den lokala databasen med servern: när något ändras, när appen kommer tillbaka i förgrunden och en gång i minuten. */
@@ -98,6 +111,7 @@ export class Syncer {
   private again = false
   private timer?: ReturnType<typeof setTimeout>
   private lastServer = ''
+  private statusFor = ''
 
   constructor(private store: Store) {}
 
@@ -160,7 +174,12 @@ export class Syncer {
   private async run() {
     const settings = this.store.meta.server
     if (!isConfigured(settings)) return this.setStatus({ state: 'off' })
-    this.setStatus({ state: 'syncing' })
+    const before = JSON.stringify(settings)
+    const prev = this.status
+    // Byttes servern ut gäller inte förra statusen längre.
+    const same = prev.state !== 'off' && this.statusFor === before
+    this.statusFor = before
+    this.setStatus({ state: 'syncing', connected: same ? prev.connected : undefined, server: same ? prev.server : undefined })
     try {
       // Skicka det som ändrats här och ta emot allt nytt från servern, tills båda är ikapp.
       for (let round = 0; round < 50; round++) {
@@ -188,10 +207,17 @@ export class Syncer {
         this.store.addRecipes(res.recipes.map(toWebRecipe))
         if (!res.more) break
       }
+      // En äldre server utan /version räknas ändå som ansluten.
+      const server = await call<Version>(settings, '/version').catch(() => undefined)
       this.store.setMeta({ lastSyncedAt: Date.now() })
-      this.setStatus({ state: 'ok' })
+      this.setStatus({ state: 'ok', connected: true, server })
     } catch (e) {
-      this.setStatus({ state: 'error', message: e instanceof ApiError ? e.message : 'Synken misslyckades.' })
+      this.setStatus({
+        state: 'error',
+        message: e instanceof ApiError ? e.message : 'Synken misslyckades.',
+        connected: false,
+        server: this.status.server,
+      })
     }
   }
 }

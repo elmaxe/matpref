@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RecipeCard, Segmented, categoryLabel, displayName } from './components'
 import { demoRecipes } from './demo'
-import type { Health, Syncer } from './server'
-import { ApiError, health, isConfigured, mixedContentProblem, toRecipe, useSyncStatus } from './server'
+import type { Health, SyncStatus, Syncer, Version } from './server'
+import { ApiError, appVersion, health, isConfigured, mixedContentProblem, toRecipe, useSyncStatus } from './server'
 import type { Actions } from './storage'
 import { PREVIEW_LABEL } from './storage'
 import type { Store, WebRecipe } from './store'
@@ -215,6 +215,48 @@ export function Matches({ store, state, actions }: { store: Store; state: AppSta
 const time = (ms: number) =>
   new Date(ms).toLocaleString('sv-SE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
 
+/** Serverns namn utan https:// och sökväg, t.ex. "matpref.tail.elmarsson.se". */
+export function serverHost(url: string) {
+  try {
+    return new URL(url.trim()).host
+  } catch {
+    return url.trim()
+  }
+}
+
+type Light = 'green' | 'red' | 'yellow' | 'gray'
+
+/** Grönt när servern svarade senast, rött när den inte gjorde det, gult medan vi ansluter för första gången. */
+function light(status: SyncStatus): Light {
+  if (status.state === 'off') return 'gray'
+  if (status.connected === true) return 'green'
+  if (status.connected === false) return 'red'
+  return 'yellow'
+}
+
+function lightText(status: SyncStatus, host: string) {
+  if (status.state === 'off') return 'Ingen server, allt sparas på telefonen'
+  if (status.connected === true) return `Ansluten till ${host}`
+  if (status.connected === false) return `Når inte ${host}`
+  return `Ansluter till ${host}…`
+}
+
+/** Liten statusrad uppe i hörnet: vilken server appen synkar med och om den går att nå. */
+export function ServerBadge({ store, syncer, onClick }: { store: Store; syncer: Syncer; onClick: () => void }) {
+  const status = useSyncStatus(syncer)
+  const host = serverHost(store.meta.server.url)
+  return (
+    <button className="server-badge" onClick={onClick} title={lightText(status, host)}>
+      <span className={`dot ${light(status)}`} aria-hidden />
+      <span className="server-badge-text">{status.state === 'off' ? 'Ingen server' : host}</span>
+      <span className="sr-only">{lightText(status, host)}</span>
+    </button>
+  )
+}
+
+const built = (v: Version) =>
+  v.built ? ` (byggd ${new Date(v.built).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short' })})` : ''
+
 /**
  * Vem som använder telefonen. Ingen inloggning: servern ska bara gå att nå via ert VPN, och det räcker att varje telefon
  * vet vem den tillhör. Visas som en fråga första gången och går att ändra under Vi.
@@ -308,18 +350,34 @@ export function ServerPanel({ store, syncer }: { store: Store; syncer: Syncer })
         {changed ? (url.trim() ? 'Spara och synka' : 'Koppla från servern') : 'Synka nu'}
       </button>
       {isConfigured(saved) && (
-        <p className="meta" aria-live="polite">
-          {status.state === 'syncing'
-            ? 'Synkar…'
-            : status.state === 'error'
-              ? `${status.message} Ändringar sparas på telefonen och synkas när servern går att nå.`
-              : store.meta.lastSyncedAt
-                ? `Synkad ${time(store.meta.lastSyncedAt)}.`
-                : 'Inte synkad än.'}
-          {pending > 0 && status.state !== 'syncing' && ` ${pending} ${pending === 1 ? 'ändring väntar' : 'ändringar väntar'} på att synkas.`}
-        </p>
+        <>
+          <p className="server-status">
+            <span className={`dot ${light(status)}`} aria-hidden />
+            {lightText(status, serverHost(saved.url))}
+          </p>
+          <p className="meta" aria-live="polite">
+            {status.state === 'syncing'
+              ? 'Synkar…'
+              : status.state === 'error'
+                ? `${status.message} Ändringar sparas på telefonen och synkas när servern går att nå.`
+                : store.meta.lastSyncedAt
+                  ? `Synkad ${time(store.meta.lastSyncedAt)}.`
+                  : 'Inte synkad än.'}
+            {pending > 0 && status.state !== 'syncing' && ` ${pending} ${pending === 1 ? 'ändring väntar' : 'ändringar väntar'} på att synkas.`}
+          </p>
+        </>
       )}
       {info && <p className="meta">{info}</p>}
+      <p className="meta versions">
+        Appen: {appVersion.version}
+        {built(appVersion)}
+        {isConfigured(saved) && (
+          <>
+            <br />
+            Servern: {status.server ? `${status.server.version}${built(status.server)}` : 'okänd'}
+          </>
+        )}
+      </p>
     </div>
   )
 }

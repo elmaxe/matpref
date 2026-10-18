@@ -87,14 +87,19 @@ Allt finns i [`appsettings.json`](Matpref.Server/appsettings.json) och kan skriv
 | `Import__TargetUnswiped` | `150` | Hämta fler när färre än så här finns kvar att swipea. |
 | `Import__MaxNewPerSource` | `40` | Max nya recept per sajt och körning. |
 | `Import__DelayMs` | `1500` | Paus mellan sidor. |
+| `Logging__LogLevel__Default` | `Information` | `Debug` eller `Trace` för mer loggning. `Logging__LogLevel__Microsoft.AspNetCore: Information` loggar varje anrop. |
 
 Fler källor läggs till under `Import:Sources` i `appsettings.json`: ett namn, en eller flera sitemaps, och reguljära uttryck för vilka undersitemaps (`SitemapPattern`) och sidor (`UrlPattern`) som är recept. Sajten behöver ha schema.org/Recipe-data på receptsidorna, vilket nästan alla receptsajter har.
 
 ## API
 
+Har servern en nyckel måste alla anrop under `/api` skicka den: `curl -H "X-Matpref-Token: <nyckel>" https://<din-adress>/api/version`.
+
 | Anrop | Vad |
 | --- | --- |
+| `GET /healthz` | Svarar `ok`, utan nyckel. Används av Dockers health check. |
 | `GET /api/health` | Antal recept per källa och om en import pågår. |
+| `GET /api/version` | Vilken version servern kör (commitens korta hash) och när den byggdes. Visas i appen under Vi. |
 | `POST /api/sync` `{ "databaseId", "cursor", "changes": [{ "key", "value", "updatedAt", "device" }] }` | Skicka telefonens ändringar och få allt nytt sedan `cursor`. Nycklar: `name/a`, `rating/a/<recept>`, `favorite/<recept>`, `cooked/<recept>`, `swipe/a/<recept>`, `hidden/<recept>`. |
 | `GET /api/recipes?after=<id>&limit=500` | Recept från nätet med id större än `after`, med sin plats (`rank`) i leken. |
 | `POST /api/import` | Kör en import nu. |

@@ -16,5 +16,10 @@ VOLUME /data
 USER $APP_UID
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
-HEALTHCHECK --interval=5m --timeout=5s CMD wget -qO- http://localhost:8080/api/health || exit 1
+# /healthz kräver ingen nyckel. Kollar ofta i början så att containern snabbt blir "healthy" (och TrueNAS slutar visa Deploying).
+HEALTHCHECK --interval=1m --timeout=5s --start-period=1m --start-interval=2s CMD wget -qO /dev/null http://127.0.0.1:8080/healthz || exit 1
+# Versionen som /api/version visar. Sätts av .github/workflows/server-image.yml. Sist, så att den inte påverkar cachen.
+ARG VERSION=dev
+ARG BUILT=
+ENV MATPREF_VERSION=$VERSION MATPREF_BUILT=$BUILT
 ENTRYPOINT ["dotnet", "Matpref.Server.dll"]
