@@ -47,6 +47,9 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// För Dockers health check. Ligger utanför /api så att den svarar utan nyckel.
+app.MapGet("/healthz", () => "ok");
+
 var api = app.MapGroup("/api");
 
 api.MapGet("/health", (Db db, Importer importer) => new
@@ -54,6 +57,13 @@ api.MapGet("/health", (Db db, Importer importer) => new
     ok = true,
     recipes = db.CountBySource(),
     importing = importer.IsRunning,
+});
+
+// Vilken version servern kör. Sätts när Docker-imagen byggs (se Dockerfile), annars "dev".
+api.MapGet("/version", (IConfiguration config) => new
+{
+    version = config["MATPREF_VERSION"] is { Length: > 0 } v ? v : "dev",
+    built = config["MATPREF_BUILT"] is { Length: > 0 } b ? b : null,
 });
 
 // Appen är local first: den sparar allt lokalt och synkar hit när den kan. Se Db.Sync.

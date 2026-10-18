@@ -11,6 +11,8 @@
   --storkok: #1971c2;
   --finmiddag: #9c36b5;
   --danger: #c92a2a;
+  --ok: #2f9e44;
+  --pending: #f08c00;
   --radius: 14px;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -31,6 +33,8 @@
     --storkok: #74c0fc;
     --finmiddag: #e599f7;
     --danger: #ff8787;
+    --ok: #69db7c;
+    --pending: #ffc078;
   }
 }
 
@@ -67,6 +71,73 @@ header {
 h1 {
   margin: 0;
   font-size: 1.6rem;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.server-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 50%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.server-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot.green {
+  background: var(--ok);
+}
+
+.dot.red {
+  background: var(--danger);
+}
+
+.dot.yellow {
+  background: var(--pending);
+}
+
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-weight: 600;
+}
+
+.versions {
+  margin-top: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 h3 {

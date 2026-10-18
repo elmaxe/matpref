@@ -4,7 +4,7 @@ import type { Syncer } from './server'
 import { toRecipe } from './server'
 import { PREVIEW_LABEL, decodeState, useAppState } from './storage'
 import type { Store } from './store'
-import { WhoAmI, allWebRecipes } from './swipe'
+import { ServerBadge, WhoAmI, allWebRecipes } from './swipe'
 import type { AppState, Filters } from './types'
 import { FavoritesView, InspirationView, PeopleView, RandomView, RecipesView } from './views'
 
@@ -67,7 +67,10 @@ export default function App({ store, syncer }: { store: Store; syncer: Syncer })
         {PREVIEW_LABEL && (
           <p className="preview-banner">Förhandsvisning av {PREVIEW_LABEL}. Ändringar här påverkar inte den riktiga appen.</p>
         )}
-        <h1>{TITLES[tab]}</h1>
+        <div className="header-row">
+          <h1>{TITLES[tab]}</h1>
+          <ServerBadge store={store} syncer={syncer} onClick={() => setTab('people')} />
+        </div>
       </header>
 
       <main>
