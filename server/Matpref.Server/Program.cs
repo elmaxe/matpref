@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Matpref.Server;
 using Microsoft.Extensions.Options;
 
@@ -53,11 +54,13 @@ app.Use(async (ctx, next) =>
 });
 
 // Valfri delad nyckel. Servern ska ligga bakom VPN, men en nyckel skadar inte.
+// Appen skickar den som ?token=, så att webbläsaren inte behöver fråga servern först (en CORS-preflight), se src/server.ts.
+// Headern X-Matpref-Token fungerar också, t.ex. med curl.
 app.Use(async (ctx, next) =>
 {
     var token = ctx.RequestServices.GetRequiredService<IOptions<MatprefOptions>>().Value.Token;
     if (!string.IsNullOrEmpty(token) && ctx.Request.Path.StartsWithSegments("/api") && !HttpMethods.IsOptions(ctx.Request.Method)
-        && ctx.Request.Headers["X-Matpref-Token"] != token)
+        && ctx.Request.Headers["X-Matpref-Token"] != token && ctx.Request.Query["token"] != token)
     {
         ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
         await ctx.Response.WriteAsJsonAsync(new { error = "Fel eller saknad nyckel" });
@@ -86,12 +89,24 @@ api.MapGet("/version", (IConfiguration config) => new
 });
 
 // Appen är local first: den sparar allt lokalt och synkar hit när den kan. Se Db.Sync.
-api.MapPost("/sync", (Db db, SyncRequest req) =>
+// Appen skickar JSON som text/plain, så att webbläsaren inte gör en CORS-preflight. Därför läses kroppen här i stället
+// för att låta ASP.NET göra det (det kräver application/json).
+api.MapPost("/sync", async (Db db, HttpRequest http) =>
 {
+    SyncRequest? req;
+    try
+    {
+        req = await JsonSerializer.DeserializeAsync<SyncRequest>(http.Body, JsonSerializerOptions.Web, http.HttpContext.RequestAborted);
+    }
+    catch (JsonException)
+    {
+        req = null;
+    }
+    if (req is null) return Results.BadRequest(new { error = "Ogiltig JSON" });
     var changes = req.Changes ?? [];
     if (changes.Length > 5000) return Results.BadRequest(new { error = "För många ändringar på en gång" });
     var bad = changes.FirstOrDefault(ch => !Db.ValidKey(ch.Key) || ch.Device is not { Length: > 0 and <= 64 }
-        || ch.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined || ch.Value.GetRawText().Length > 2000);
+        || ch.Value.ValueKind == JsonValueKind.Undefined || ch.Value.GetRawText().Length > 2000);
     if (bad is not null) return Results.BadRequest(new { error = $"Ogiltig ändring: {bad.Key}" });
     // En annan databas än telefonen synkade med sist: börja om från början.
     var cursor = req.DatabaseId == db.DatabaseId ? req.Cursor : 0;
