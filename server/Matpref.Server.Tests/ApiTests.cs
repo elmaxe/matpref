@@ -169,4 +169,16 @@ public sealed class ApiTests : IDisposable
         Assert.Equal("3baefba", res.GetProperty("version").GetString());
         Assert.Equal("2026-10-18T19:14:13Z", res.GetProperty("built").GetString());
     }
+
+    [Fact]
+    public async Task Allowed_origin_may_include_the_apps_path()
+    {
+        using var factory = Factory().WithWebHostBuilder(b => b.UseSetting("Matpref:AllowedOrigins:0", "https://elmaxe.github.io/matpref/"));
+        var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/sync");
+        preflight.Headers.Add("Origin", "https://elmaxe.github.io");
+        preflight.Headers.Add("Access-Control-Request-Method", "POST");
+        preflight.Headers.Add("Access-Control-Request-Headers", "content-type,x-matpref-token");
+        var res = await factory.CreateClient().SendAsync(preflight);
+        Assert.Equal("https://elmaxe.github.io", res.Headers.GetValues("Access-Control-Allow-Origin").Single());
+    }
 }

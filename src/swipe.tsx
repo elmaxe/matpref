@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { RecipeCard, Segmented, categoryLabel, displayName } from './components'
 import { demoRecipes } from './demo'
 import type { Health, SyncStatus, Syncer, Version } from './server'
-import { ApiError, appVersion, health, isConfigured, mixedContentProblem, toRecipe, useSyncStatus } from './server'
+import { ApiError, appVersion, health, isConfigured, mixedContentProblem, normalizeUrl, toRecipe, useSyncStatus } from './server'
 import type { Actions } from './storage'
 import { PREVIEW_LABEL } from './storage'
 import type { Store, WebRecipe } from './store'
@@ -296,15 +296,18 @@ export function ServerPanel({ store, syncer }: { store: Store; syncer: Syncer })
   const [url, setUrl] = useState(store.meta.server.url)
   const [token, setToken] = useState(store.meta.server.token)
   const [info, setInfo] = useState<string>()
-  const problem = url.trim() ? mixedContentProblem(url) : undefined
+  const problem = url.trim() ? mixedContentProblem(normalizeUrl(url)) : undefined
   const saved = store.meta.server
-  const changed = url.trim() !== saved.url || token !== saved.token
+  const changed = normalizeUrl(url) !== saved.url || token.trim() !== saved.token
   const pending = store.dirtyEntries().length
 
   const save = async () => {
-    store.setMeta({ server: { url: url.trim(), token } })
+    const clean = normalizeUrl(url)
+    setUrl(clean)
+    setToken(token.trim())
+    store.setMeta({ server: { url: clean, token: token.trim() } })
     setInfo(undefined)
-    if (!url.trim()) return
+    if (!clean) return
     await syncer.sync()
     try {
       const h: Health = await health(store.meta.server)

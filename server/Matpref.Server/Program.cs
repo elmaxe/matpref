@@ -19,7 +19,10 @@ builder.Services.AddSingleton(sp =>
     ActivatorUtilities.CreateInstance<Importer>(sp, sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(Importer))));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Importer>());
 
-var origins = builder.Configuration.GetSection("Matpref:AllowedOrigins").Get<string[]>() ?? [];
+// Webbläsaren skickar bara schema och värd ("https://elmaxe.github.io"), så sökväg och snedstreck i inställningen tas bort.
+var origins = (builder.Configuration.GetSection("Matpref:AllowedOrigins").Get<string[]>() ?? [])
+    .Select(o => Uri.TryCreate(o.Trim(), UriKind.Absolute, out var u) ? u.GetLeftPart(UriPartial.Authority) : o.Trim())
+    .ToArray();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
