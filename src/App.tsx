@@ -36,7 +36,7 @@ function readImport(): AppState | undefined {
 }
 
 export default function App({ store, syncer }: { store: Store; syncer: Syncer }) {
-  const { state, actions } = useAppState(store)
+  const { state, actions, me } = useAppState(store)
   const [tab, setTab] = useState<Tab>('random')
   const [filters, setFilters] = useState<Filters>({ categories: [], who: 'both', source: 'all' })
   const [pendingImport, setPendingImport] = useState(readImport)
@@ -62,7 +62,7 @@ export default function App({ store, syncer }: { store: Store; syncer: Syncer })
     setTab('random')
   }
 
-  const props = { recipes, state, actions }
+  const props = { recipes, state, actions, me }
 
   return (
     <div className="app">

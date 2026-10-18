@@ -200,6 +200,7 @@ export function Matches({ store, state, actions }: { store: Store; state: AppSta
             recipe={toRecipe(r)}
             state={state}
             actions={actions}
+            me={store.meta.me}
             extra={
               <button className="link-btn muted" onClick={() => store.hideMatch(r.id)}>
                 Ta bort från matchningar

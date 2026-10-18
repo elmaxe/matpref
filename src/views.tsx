@@ -15,12 +15,14 @@ interface ViewProps {
   recipes: Recipe[]
   state: AppState
   actions: Actions
+  me: PersonId
 }
 
 export function RandomView({
   recipes,
   state,
   actions,
+  me,
   filters,
   setFilters,
 }: ViewProps & { filters: Filters; setFilters: (f: Filters) => void }) {
@@ -92,7 +94,7 @@ export function RandomView({
 
       {result && !spinning && (
         <div className="result" aria-live="polite">
-          <RecipeCard key={result.id} recipe={result} state={state} actions={actions} big />
+          <RecipeCard key={result.id} recipe={result} state={state} actions={actions} me={me} big />
           <button
             className="primary"
             disabled={cookedNow}
@@ -110,7 +112,7 @@ export function RandomView({
   )
 }
 
-export function RecipesView({ recipes, state, actions, store }: ViewProps & { store: Store }) {
+export function RecipesView({ recipes, state, actions, me, store }: ViewProps & { store: Store }) {
   const [query, setQuery] = useState('')
   const [cats, setCats] = useState<Category[]>([])
   const q = query.trim().toLowerCase()
@@ -132,7 +134,7 @@ export function RecipesView({ recipes, state, actions, store }: ViewProps & { st
         />
         <CategoryChips value={cats} onChange={setCats} />
       </div>
-      <RecipeList list={list} state={state} actions={actions} empty="Inga recept matchar sökningen." />
+      <RecipeList list={list} state={state} actions={actions} me={me} empty="Inga recept matchar sökningen." />
       <AddRecipe store={store} actions={actions} />
     </section>
   )
@@ -207,7 +209,7 @@ function AddRecipe({ store, actions }: { store: Store; actions: Actions }) {
   )
 }
 
-export function FavoritesView({ recipes, state, actions, onRoll }: ViewProps & { onRoll: () => void }) {
+export function FavoritesView({ recipes, state, actions, me, onRoll }: ViewProps & { onRoll: () => void }) {
   const list = recipes.filter((r) => state.favorites.includes(r.id))
   return (
     <section>
@@ -219,12 +221,12 @@ export function FavoritesView({ recipes, state, actions, onRoll }: ViewProps & {
           </button>
         )}
       </div>
-      <RecipeList list={list} state={state} actions={actions} empty="Inga favoriter än." />
+      <RecipeList list={list} state={state} actions={actions} me={me} empty="Inga favoriter än." />
     </section>
   )
 }
 
-export function InspirationView({ recipes, state, actions, store, onRoll }: ViewProps & { store: Store; onRoll: () => void }) {
+export function InspirationView({ recipes, state, actions, me, store, onRoll }: ViewProps & { store: Store; onRoll: () => void }) {
   // Matchningarna från nätet visas för sig, så här blir det bara era egna recept.
   const list = recipes.filter((r) => isNew(r, state) && !r.source)
   return (
@@ -244,6 +246,7 @@ export function InspirationView({ recipes, state, actions, store, onRoll }: View
         list={list}
         state={state}
         actions={actions}
+        me={me}
         empty="Ni har testat allt! Lägg till fler rätter under Recept så dyker de upp här."
       />
       <AddRecipe store={store} actions={actions} />
@@ -251,12 +254,12 @@ export function InspirationView({ recipes, state, actions, store, onRoll }: View
   )
 }
 
-export function PeopleView({ recipes, state, actions, store, syncer }: ViewProps & { store: Store; syncer: Syncer }) {
+export function PeopleView({ recipes, state, actions, me, store, syncer }: ViewProps & { store: Store; syncer: Syncer }) {
   return (
     <section>
       <WhoAmI store={store} state={state} />
       {PERSON_IDS.map((p) => (
-        <PersonPanel key={p} person={p} recipes={recipes} state={state} actions={actions} />
+        <PersonPanel key={p} person={p} recipes={recipes} state={state} actions={actions} me={me} />
       ))}
       <ServerPanel store={store} syncer={syncer} />
       <SyncPanel state={state} actions={actions} />
@@ -264,15 +267,21 @@ export function PeopleView({ recipes, state, actions, store, syncer }: ViewProps
   )
 }
 
-function PersonPanel({ person, recipes, state, actions }: ViewProps & { person: PersonId }) {
+function PersonPanel({ person, recipes, state, actions, me }: ViewProps & { person: PersonId }) {
   const byRating = (rating: 'like' | 'dislike') => recipes.filter((r) => state.ratings[person][r.id] === rating)
   const name = displayName(state, person)
+  // Den andras namn och betyg visas, men bara den själv kan ändra dem.
+  const mine = person === me
   return (
     <div className="panel person">
-      <label className="field">
-        <span className="field-label">Namn</span>
-        <input value={state.names[person]} onChange={(e) => actions.rename(person, e.target.value)} placeholder={name} />
-      </label>
+      {mine ? (
+        <label className="field">
+          <span className="field-label">Ditt namn</span>
+          <input value={state.names[person]} onChange={(e) => actions.rename(e.target.value)} placeholder={name} />
+        </label>
+      ) : (
+        <h3>{name}</h3>
+      )}
       {(['like', 'dislike'] as const).map((rating) => {
         const list = byRating(rating)
         return (
@@ -281,7 +290,7 @@ function PersonPanel({ person, recipes, state, actions }: ViewProps & { person: 
               {rating === 'like' ? `👍 ${name} gillar` : `👎 ${name} gillar inte`} ({list.length})
             </h4>
             {list.length === 0 ? (
-              <p className="meta">Inget här än. Tyck till om rätter under Recept.</p>
+              <p className="meta">{mine ? 'Inget här än. Tyck till om rätter under Recept.' : 'Inget här än.'}</p>
             ) : (
               <ul className="pref-list">
                 {list.map((r) => (
@@ -289,9 +298,11 @@ function PersonPanel({ person, recipes, state, actions }: ViewProps & { person: 
                     <span>
                       {r.name} <span className={`badge cat-${r.category}`}>{categoryLabel(r.category)}</span>
                     </span>
-                    <button className="icon-btn small" aria-label={`Ta bort ${r.name}`} onClick={() => actions.rate(person, r.id, rating)}>
-                      ✕
-                    </button>
+                    {mine && (
+                      <button className="icon-btn small" aria-label={`Ta bort ${r.name}`} onClick={() => actions.rate(r.id, rating)}>
+                        ✕
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

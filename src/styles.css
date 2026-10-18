@@ -718,3 +718,8 @@ a.link-btn {
   flex: 1;
   min-width: 0;
 }
+
+.rating-other {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
