@@ -106,7 +106,7 @@ api.MapPost("/sync", async (Db db, HttpRequest http) =>
     var changes = req.Changes ?? [];
     if (changes.Length > 5000) return Results.BadRequest(new { error = "För många ändringar på en gång" });
     var bad = changes.FirstOrDefault(ch => !Db.ValidKey(ch.Key) || ch.Device is not { Length: > 0 and <= 64 }
-        || ch.Value.ValueKind == JsonValueKind.Undefined || ch.Value.GetRawText().Length > 2000);
+        || ch.Value.ValueKind == JsonValueKind.Undefined || ch.Value.GetRawText().Length > Db.MaxValueLength(ch.Key));
     if (bad is not null) return Results.BadRequest(new { error = $"Ogiltig ändring: {bad.Key}" });
     // En annan databas än telefonen synkade med sist: börja om från början.
     var cursor = req.DatabaseId == db.DatabaseId ? req.Cursor : 0;

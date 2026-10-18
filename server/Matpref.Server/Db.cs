@@ -26,7 +26,7 @@ public record Change(string Key, JsonElement Value, long UpdatedAt, string Devic
 public class Db
 {
     // Nycklarna appen använder. Allt annat avvisas, så att servern inte blir en allmän lagringsplats.
-    static readonly string[] KeyPrefixes = ["name/", "rating/", "favorite/", "cooked/", "swipe/", "hidden/"];
+    static readonly string[] KeyPrefixes = ["name/", "rating/", "favorite/", "cooked/", "swipe/", "hidden/", "recipe/"];
 
     readonly string _connectionString;
 
@@ -37,6 +37,9 @@ public class Db
         _connectionString = new SqliteConnectionStringBuilder { DataSource = path, Pooling = true }.ToString();
         Migrate();
     }
+
+    /// <summary>Största tillåtna värde i tecken. Recept (ingredienser och steg) får vara större än resten.</summary>
+    public static int MaxValueLength(string key) => key.StartsWith("recipe/") ? 20_000 : 2000;
 
     public static bool ValidKey(string key) =>
         key.Length is > 0 and <= 200 && KeyPrefixes.Any(key.StartsWith) && !key.Any(char.IsControl);

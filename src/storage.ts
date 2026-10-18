@@ -1,7 +1,8 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { openDb, idbBackend, readAll } from './idb'
+import { seedRecipes } from './recipes'
 import { Store } from './store'
-import type { AppState, PersonId, Rating } from './types'
+import type { AppState, PersonId, Rating, Recipe } from './types'
 import { PERSON_IDS } from './types'
 
 export const PREVIEW_LABEL: string | undefined = import.meta.env.VITE_PREVIEW_LABEL
@@ -91,6 +92,7 @@ export async function openStore(): Promise<Store> {
     // Ingen IndexedDB (t.ex. vissa privata lägen): appen fungerar, men glömmer allt när den stängs.
     store = new Store()
   }
+  store.seed(seedRecipes)
   if (store.meta.migrated) return store
 
   let copied = false
@@ -131,6 +133,8 @@ export function useAppState(store: Store) {
       markCooked: (id: string) => store.markCooked(id, today()),
       rename: (person: PersonId, name: string) => store.rename(person, name),
       importState: (incoming: AppState) => store.importState(incoming),
+      saveRecipe: (r: Omit<Recipe, 'id'> & { id?: string }) => store.saveRecipe(r),
+      deleteRecipe: (id: string) => store.deleteRecipe(id),
       reset: () => void store.reset(),
     }),
     [store],

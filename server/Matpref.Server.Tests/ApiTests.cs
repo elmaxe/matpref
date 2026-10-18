@@ -107,6 +107,18 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Syncs_whole_recipes_but_not_huge_ones()
+    {
+        var recipe = new { name = "Lasagne", category = "storkok", steps = Enumerable.Repeat("Ett ganska långt steg i receptet.", 100) };
+        var res = await Sync(0, null, Change("recipe/lasagne", recipe, 1));
+        Assert.Contains("Lasagne", Values(res)["recipe/lasagne"]);
+
+        var huge = new { name = "För stort", category = "fast", steps = Enumerable.Repeat(new string('x', 1000), 30) };
+        var bad = await _client.PostAsJsonAsync("/api/sync", new { cursor = 0, changes = new[] { Change("recipe/stort", huge, 1) } });
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+    }
+
+    [Fact]
     public async Task Lists_recipes_in_pages_with_their_shared_rank()
     {
         Seed(5);

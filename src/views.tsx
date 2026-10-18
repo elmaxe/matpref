@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { CategoryChips, RecipeCard, RecipeList, Segmented, categoryLabel, displayName } from './components'
+import { CategoryChips, RecipeCard, RecipeForm, RecipeList, Segmented, categoryLabel, displayName } from './components'
 import { candidates, isNew, pick } from './random'
-import { newRecipeUrl } from './recipes'
 import type { Syncer } from './server'
 import type { Store } from './store'
 import type { Actions } from './storage'
@@ -132,22 +131,37 @@ export function RecipesView({ recipes, state, actions }: ViewProps) {
         <CategoryChips value={cats} onChange={setCats} />
       </div>
       <RecipeList list={list} state={state} actions={actions} empty="Inga recept matchar sökningen." />
-      <AddRecipe />
+      <AddRecipe actions={actions} />
     </section>
   )
 }
 
-function AddRecipe() {
+/** Lägg till en egen rätt. Den sparas i databasen och synkas till den andra telefonen som allt annat. */
+function AddRecipe({ actions }: { actions: Actions }) {
+  const [adding, setAdding] = useState(false)
+  const [added, setAdded] = useState<string>()
+  if (adding) {
+    return (
+      <div className="panel">
+        <h3>Ny rätt</h3>
+        <RecipeForm
+          onSave={(r) => {
+            actions.saveRecipe(r)
+            setAdded(r.name)
+            setAdding(false)
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      </div>
+    )
+  }
   return (
     <div className="panel add">
       <h3>Saknas en rätt?</h3>
-      <p>
-        Recepten ligger som filer i <code>recipes/</code> i repot. Lägg till en fil så blir det en pull request, och när den är
-        mergad finns rätten i appen.
-      </p>
-      <a className="button" href={newRecipeUrl} target="_blank" rel="noreferrer">
-        Lägg till recept på GitHub ↗
-      </a>
+      {added && <p className="meta">{added} är tillagd.</p>}
+      <button className="primary" onClick={() => setAdding(true)}>
+        Lägg till rätt
+      </button>
     </div>
   )
 }
@@ -189,9 +203,9 @@ export function InspirationView({ recipes, state, actions, store, onRoll }: View
         list={list}
         state={state}
         actions={actions}
-        empty="Ni har testat allt! Lägg till fler recept via GitHub så dyker de upp här."
+        empty="Ni har testat allt! Lägg till fler rätter under Recept så dyker de upp här."
       />
-      <AddRecipe />
+      <AddRecipe actions={actions} />
     </section>
   )
 }

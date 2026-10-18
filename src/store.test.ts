@@ -118,3 +118,47 @@ describe('synk', () => {
     })
   })
 })
+
+describe('recept', () => {
+  const lasagne = { id: 'lasagne', name: 'Lasagne', category: 'storkok' as const, ingredients: ['Plattor'] }
+
+  it('lägger in grundrecepten en gång, och en ändring på en telefon vinner över grundreceptet på den andra', () => {
+    const a = phone('a')
+    const b = phone('b')
+    a.seed([lasagne])
+    b.seed([lasagne])
+    expect(a.ownRecipes().map((r) => r.name)).toEqual(['Lasagne'])
+
+    a.saveRecipe({ ...lasagne, name: 'Mormors lasagne' })
+    sync(a, b)
+    sync(b, a)
+    expect(b.ownRecipes().map((r) => r.name)).toEqual(['Mormors lasagne'])
+    expect(a.ownRecipes().map((r) => r.name)).toEqual(['Mormors lasagne'])
+
+    // Startar appen igen läggs grundreceptet inte tillbaka över ändringen.
+    b.seed([lasagne])
+    expect(b.ownRecipes().map((r) => r.name)).toEqual(['Mormors lasagne'])
+  })
+
+  it('lägger till och tar bort recept, och ett borttaget grundrecept kommer inte tillbaka', () => {
+    const a = phone('a')
+    a.seed([lasagne])
+    const id = a.saveRecipe({ name: 'Kycklinggryta med ris', category: 'fast' })
+    expect(id).toBe('kycklinggryta-med-ris')
+    expect(a.saveRecipe({ name: 'Kycklinggryta med ris', category: 'fast' })).not.toBe(id)
+    a.deleteRecipe('lasagne')
+    a.seed([lasagne])
+    expect(a.ownRecipes().map((r) => r.id)).not.toContain('lasagne')
+    expect(a.dirtyEntries().map((e) => e.key)).toContain('recipe/lasagne')
+  })
+
+  it('hoppar över trasiga recept från en annan telefon', () => {
+    const a = phone('a')
+    a.applyRemote([
+      { key: 'recipe/x', value: { name: '', category: 'fast' }, updatedAt: 5, device: 'b' },
+      { key: 'recipe/y', value: { name: 'Soppa', category: 'okänd' }, updatedAt: 5, device: 'b' },
+      { key: 'recipe/z', value: { name: 'Soppa', category: 'fast', servings: 'fyra' }, updatedAt: 5, device: 'b' },
+    ])
+    expect(a.ownRecipes().map((r) => [r.id, r.servings])).toEqual([['z', undefined]])
+  })
+})

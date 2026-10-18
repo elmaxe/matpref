@@ -12,14 +12,16 @@ Appen fungerar offline och kan installeras på hemskärmen ("Lägg till på hems
 
 ## Var sparas vad?
 
-- **Recepten** ligger som JSON-filer i [`recipes/`](recipes/) och byggs in i appen. Nya recept läggs till med en pull request.
-- **Allt ni gör i appen** (namn, betyg, favoriter, vad ni har lagat, swipes) sparas i en databas på telefonen (IndexedDB), så appen fungerar helt offline.
+- **Allt** (recepten, namn, betyg, favoriter, vad ni har lagat, swipes) sparas i en databas på telefonen (IndexedDB), så appen fungerar helt offline.
+- **Recepten** läggs till, ändras och tas bort i appen. Grundrecepten i [`recipes/`](recipes/) läggs in i databasen första gången appen startar; sedan är det databasen som gäller.
 - **Med en egen server** synkas det mellan era telefoner när de når servern, och ni får recept från nätet att swipea. Se [`server/`](server/README.md).
 - **Utan server** kan ni dela en länk under fliken *Vi* som slår ihop listorna på den andra telefonen.
 
 ## Lägga till ett recept
 
-Enklast är knappen *Lägg till recept på GitHub* i appen, som öppnar en ny fil med en mall. Annars: skapa `recipes/<namn-med-bindestreck>.json` och öppna en PR.
+Under *Recept*: tryck *Lägg till rätt* längst ned. Ett recept ändras eller tas bort med *Ändra receptet* på kortet. Med server synkas det till den andra telefonen.
+
+Grundrecepten i `recipes/` är JSON-filer i det här formatet. Bara `name` och `category` (`fast`, `storkok` eller `finmiddag`) krävs, och filnamnet blir receptets id. En ny fil där dyker upp i appen efter nästa publicering, om det inte redan finns ett recept med samma id i databasen. CI kör `npm run validate` på varje PR.
 
 ```json
 {
@@ -34,8 +36,6 @@ Enklast är knappen *Lägg till recept på GitHub* i appen, som öppnar en ny fi
   "link": "https://exempel.se/recept"
 }
 ```
-
-Bara `name` och `category` (`fast`, `storkok` eller `finmiddag`) krävs. Filnamnet blir receptets id, så byt inte namn på en fil i efterhand (då tappar ni betygen för den). CI kör `npm run validate` på varje PR och säger till om något är fel.
 
 ## Utveckling
 
