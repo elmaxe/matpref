@@ -1,7 +1,7 @@
 import type { FormEvent, ReactNode } from 'react'
 import { useState } from 'react'
 import type { Actions } from './storage'
-import type { AppState, Category, Recipe } from './types'
+import type { AppState, Category, PersonId, Recipe } from './types'
 import { CATEGORIES, PERSON_IDS } from './types'
 
 export const categoryLabel = (c: Category) => CATEGORIES.find((x) => x.id === c)?.label ?? c
@@ -58,6 +58,8 @@ interface CardProps {
   recipe: Recipe
   state: AppState
   actions: Actions
+  /** Den här telefonens person. Bara hen kan tycka till här, den andras betyg visas. */
+  me: PersonId
   defaultOpen?: boolean
   big?: boolean
   /** Extra knappar längst ned på kortet. */
@@ -165,7 +167,7 @@ export function RecipeForm({
   )
 }
 
-export function RecipeCard({ recipe, state, actions, defaultOpen = false, big = false, extra }: CardProps) {
+export function RecipeCard({ recipe, state, actions, me, defaultOpen = false, big = false, extra }: CardProps) {
   const [open, setOpen] = useState(defaultOpen)
   const [editing, setEditing] = useState(false)
   if (editing) {
@@ -214,22 +216,30 @@ export function RecipeCard({ recipe, state, actions, defaultOpen = false, big = 
         {PERSON_IDS.map((p) => {
           const r = state.ratings[p][recipe.id]
           const name = displayName(state, p)
+          if (p !== me) {
+            return (
+              <div className="rating" key={p}>
+                <span className="rating-name">{name}</span>
+                <span className="rating-other">{r === 'like' ? '👍' : r === 'dislike' ? '👎' : 'har inte tyckt till'}</span>
+              </div>
+            )
+          }
           return (
             <div className="rating" key={p}>
               <span className="rating-name">{name}</span>
               <button
                 className="icon-btn small"
                 aria-pressed={r === 'like'}
-                aria-label={`${name} gillar`}
-                onClick={() => actions.rate(p, recipe.id, 'like')}
+                aria-label="Jag gillar"
+                onClick={() => actions.rate(recipe.id, 'like')}
               >
                 👍
               </button>
               <button
                 className="icon-btn small"
                 aria-pressed={r === 'dislike'}
-                aria-label={`${name} gillar inte`}
-                onClick={() => actions.rate(p, recipe.id, 'dislike')}
+                aria-label="Jag gillar inte"
+                onClick={() => actions.rate(recipe.id, 'dislike')}
               >
                 👎
               </button>
@@ -292,12 +302,24 @@ export function RecipeCard({ recipe, state, actions, defaultOpen = false, big = 
   )
 }
 
-export function RecipeList({ list, state, actions, empty }: { list: Recipe[]; state: AppState; actions: Actions; empty: string }) {
+export function RecipeList({
+  list,
+  state,
+  actions,
+  me,
+  empty,
+}: {
+  list: Recipe[]
+  state: AppState
+  actions: Actions
+  me: PersonId
+  empty: string
+}) {
   if (list.length === 0) return <p className="empty">{empty}</p>
   return (
     <div className="list">
       {list.map((r) => (
-        <RecipeCard key={r.id} recipe={r} state={state} actions={actions} />
+        <RecipeCard key={r.id} recipe={r} state={state} actions={actions} me={me} />
       ))}
     </div>
   )

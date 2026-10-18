@@ -3,10 +3,10 @@
 En PWA som hjälper oss att bestämma vad vi ska äta. Slumpa fram en rätt utifrån kategori, vem som äter och vad ni gillar.
 
 - **Slumpa**: välj kategori (Snabbt, Storkok, Finmiddag), vem som äter och om det ska vara bland alla, favoriter, gillade eller nya rätter. Rätter som någon av de som äter ogillar tas bort, gillade rätter och favoriter kommer upp oftare och sådant ni lagat den senaste veckan mer sällan.
-- **Recept**: alla rätter med sök och filter. Varje person kan sätta 👍 eller 👎.
+- **Recept**: alla rätter med sök och filter. Var och en sätter 👍 eller 👎 för sig själv på sin telefon och ser vad den andra tycker.
 - **Favoriter**: era gemensamma favoriter (♥).
 - **Inspiration**: swipea recept från ICA, Arla, Coop och Köket.se. Rätter ni båda swipar höger på blir matchningar och hamnar bland era recept. Utan server finns exempelrecept att testa med. Under det: era egna rätter som ingen av er har testat än.
-- **Vi**: namn och varje persons lista över vad den gillar och inte gillar, plus synk mellan telefoner.
+- **Vi**: ditt namn, och din och den andras lista över vad den gillar och inte gillar, plus synk mellan telefoner.
 
 Appen fungerar offline och kan installeras på hemskärmen ("Lägg till på hemskärmen" i Safari eller Chrome).
 

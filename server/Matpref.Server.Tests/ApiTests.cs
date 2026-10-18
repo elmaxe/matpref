@@ -137,9 +137,25 @@ public sealed class ApiTests : IDisposable
     {
         Seed(3);
         var ids = Db.Recipes(0, 10).Recipes.Select(r => r.Id).ToArray();
-        await Sync(0, null, Change($"swipe/a/{ids[0]}", true, 1), Change($"swipe/b/{ids[0]}", false, 1), Change($"swipe/a/{ids[1]}", true, 1),
-            Change($"swipe/b/{ids[2]}", null, 1));
+        // Appen kallar recept 12 från servern för "web-12".
+        await Sync(0, null, Change($"swipe/a/web-{ids[0]}", true, 1), Change($"swipe/b/web-{ids[0]}", false, 1),
+            Change($"swipe/a/web-{ids[1]}", true, 1), Change($"swipe/b/web-{ids[2]}", null, 1));
         Assert.Equal(2, Db.UnswipedCount());
+    }
+
+    [Fact]
+    public async Task Removes_desserts_that_were_imported_before_and_tells_the_phones()
+    {
+        Seed(2);
+        Db.AddRecipe("Köket.se", new RecipeMeta("https://x.se/recept/sommardrom/", "Sommardröm med mandelmaräng och färska bär",
+            "Rosa mandelmarängbottnar, grädde och massor av färska bär i en enkel men fantastisk sommartårta.", null, 60, 8, [], []), "storkok");
+        var cake = Db.Recipes(0, 10).Recipes.Single(r => r.Title.StartsWith("Sommardröm")).Id;
+
+        Assert.Equal(1, Db.RemoveNotDinners());
+        Assert.Equal(0, Db.RemoveNotDinners());
+        Assert.DoesNotContain(Db.Recipes(0, 10).Recipes, r => r.Id == cake);
+        Assert.Equal(2, Db.UnswipedCount());
+        Assert.Equal("true", Values(await Sync(0, null))[$"hidden/web-{cake}"]);
     }
 
     [Fact]

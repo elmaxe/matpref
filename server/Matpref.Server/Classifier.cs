@@ -11,12 +11,28 @@ public static class Classifier
         "tillbehör", "dipp", "smoothie", "snacks", "pålägg",
     ];
 
-    // Säkra tecken i själva namnet på att det inte är middag. "Kaka" saknas med flit: pannkaka är middag.
+    // Nyckelord som betyder söt eller inte middag. Kortare än listan ovan, eftersom nyckelord på en middag kan vara
+    // t.ex. "sås" eller "bröd".
+    static readonly string[] SweetKeywords =
+    [
+        "efterrätt", "dessert", "bakning", "bakverk", "kaka", "kakor", "tårta", "tårtor", "godis", "konfekt", "glass", "fika",
+        "dryck", "drink", "cocktail", "smoothie", "mellanmål",
+    ];
+
+    // Säkra tecken i namnet på att det inte är middag. Kakor känns igen för sig (se IsSweetName), eftersom pannkaka är middag.
     static readonly string[] NotDinnerNames =
     [
-        "muffins", "cookies", "cupcake", "kladdkaka", "chokladboll", "smoothie", "drink", "lemonad", "saft", "glass", "sorbet",
-        "cheesecake", "brownie", "kanelbulle", "semla", "tryffel", "marmelad",
+        "muffins", "cookies", "cupcake", "chokladboll", "smoothie", "drink", "lemonad", "saft", "glass", "sorbet", "cheesecake",
+        "brownie", "kanelbulle", "semla", "tryffel", "marmelad", "tårt", "maräng", "pavlova", "pannacotta", "panna cotta",
+        "tiramisu", "crumble", "smulpaj", "äppelpaj", "parfait", "mazarin", "biskvi", "fudge", "praliner", "bakelse", "efterrätt",
+        "dessert", "glögg", "sockerkaka", "toscakaka",
     ];
+
+    // Tecken i beskrivningen, t.ex. "en fantastisk sommartårta" eller "gott till kaffet".
+    static readonly string[] NotDinnerDescriptions = ["efterrätt", "dessert", "tårta", "tårtor", "maräng", "bakverk", "fika", "kaffet", "godis"];
+
+    // Kakor som är middag: pannkaka, potatiskakor, fiskkakor och liknande.
+    static readonly string[] SavoryCakes = ["pannkak", "potatis", "fisk", "lax", "kött", "kyckling", "grönsak", "sill", "krabb"];
 
     static readonly string[] Fancy =
     [
@@ -34,10 +50,22 @@ public static class Classifier
 
     public static bool IsDinner(RecipeMeta r)
     {
-        var categories = Tokens(r.Categories);
-        if (categories.Any(t => NotDinnerCategories.Any(k => t == k || (k.Length >= 5 && t.Contains(k))))) return false;
-        var name = r.Title.ToLowerInvariant();
-        return !NotDinnerNames.Any(name.Contains);
+        if (Tokens(r.Categories).Any(t => NotDinnerCategories.Any(k => t == k || (k.Length >= 5 && t.Contains(k))))) return false;
+        if (Tokens(r.Keywords).Any(t => SweetKeywords.Any(k => t == k || (k.Length >= 5 && t.Contains(k))))) return false;
+        return LooksLikeDinner(r.Title, r.Description);
+    }
+
+    /// <summary>
+    /// Det som går att avgöra av bara namn och beskrivning. Används också för att städa bort recept som redan är importerade,
+    /// eftersom databasen inte sparar sajtens kategorier.
+    /// </summary>
+    public static bool LooksLikeDinner(string title, string? description)
+    {
+        var name = title.ToLowerInvariant();
+        if (NotDinnerNames.Any(name.Contains)) return false;
+        // Kakor (kladdkaka, morotskaka, havrekakor), men inte pannkaka eller fiskkakor.
+        if (Tokens([title]).Any(t => (t.EndsWith("kaka") || t.EndsWith("kakor")) && !SavoryCakes.Any(t.Contains))) return false;
+        return !Matches(Tokens([description ?? ""]), NotDinnerDescriptions);
     }
 
     public static string GuessCategory(RecipeMeta r)

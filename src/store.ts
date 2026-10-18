@@ -367,6 +367,8 @@ export class Store {
     const partnerAt = (id: string) => this.entries.get(swipeKey(other, id))?.updatedAt ?? 0
     return pool
       .filter((r) => this.get(swipeKey(me, r.id)) === null && this.get(swipeKey(other, r.id)) !== false)
+      // Recept servern har tagit bort, t.ex. efterrätter som kom med innan filtret blev bättre.
+      .filter((r) => this.get(`hidden/${r.id}`) !== true)
       .filter((r) => !category || r.category === category)
       .sort((x, y) => {
         const px = this.get(swipeKey(other, x.id)) === true

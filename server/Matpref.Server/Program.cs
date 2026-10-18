@@ -28,6 +28,10 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(origins).All
 
 var app = builder.Build();
 
+// Filtret för vad som är middag blir bättre ibland. Ta bort det som redan importerats men inte längre räknas.
+if (app.Services.GetRequiredService<Db>().RemoveNotDinners() is > 0 and var removed)
+    app.Logger.LogInformation("Tog bort {Count} recept som inte är middag", removed);
+
 // Chrome frågar innan en publik sida (github.io) får anropa en adress i hemnätverket. Svara ja på den frågan.
 app.Use(async (ctx, next) =>
 {

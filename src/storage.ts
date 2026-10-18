@@ -126,12 +126,14 @@ export async function openStore(): Promise<Store> {
 export function useAppState(store: Store) {
   useSyncExternalStore(store.subscribe, store.getVersion)
   const state = store.state()
+  // Var och en tycker bara till och byter namn för sig själv: den här telefonens person.
+  const me = store.meta.me
   const actions = useMemo(
     () => ({
-      rate: (person: PersonId, id: string, rating: Rating) => store.rate(person, id, rating),
+      rate: (id: string, rating: Rating) => store.rate(store.meta.me, id, rating),
       toggleFavorite: (id: string) => store.toggleFavorite(id),
       markCooked: (id: string) => store.markCooked(id, today()),
-      rename: (person: PersonId, name: string) => store.rename(person, name),
+      rename: (name: string) => store.rename(store.meta.me, name),
       importState: (incoming: AppState) => store.importState(incoming),
       saveRecipe: (r: Omit<Recipe, 'id'> & { id?: string }) => store.saveRecipe(r),
       deleteRecipe: (id: string) => store.deleteRecipe(id),
@@ -139,7 +141,7 @@ export function useAppState(store: Store) {
     }),
     [store],
   )
-  return { state, actions }
+  return { state, actions, me }
 }
 
 export type Actions = ReturnType<typeof useAppState>['actions']
