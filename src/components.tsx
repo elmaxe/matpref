@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import type { Actions } from './storage'
 import type { AppState, Category, Recipe } from './types'
@@ -59,21 +60,25 @@ interface CardProps {
   actions: Actions
   defaultOpen?: boolean
   big?: boolean
+  /** Extra knappar längst ned på kortet. */
+  extra?: ReactNode
 }
 
-export function RecipeCard({ recipe, state, actions, defaultOpen = false, big = false }: CardProps) {
+export function RecipeCard({ recipe, state, actions, defaultOpen = false, big = false, extra }: CardProps) {
   const [open, setOpen] = useState(defaultOpen)
   const fav = state.favorites.includes(recipe.id)
   const cooked = state.cooked[recipe.id]
-  const hasDetails = !!(recipe.ingredients?.length || recipe.steps?.length || recipe.link)
+  const hasDetails = !!(recipe.ingredients?.length || recipe.steps?.length)
 
   return (
     <article className={`card${big ? ' card-big' : ''}`}>
+      {recipe.image && <img className="card-img" src={recipe.image} alt="" loading="lazy" referrerPolicy="no-referrer" />}
       <div className="card-head">
         <div>
           <span className={`badge cat-${recipe.category}`}>{categoryLabel(recipe.category)}</span>
           {recipe.timeMinutes && <span className="meta">⏱ {recipe.timeMinutes} min</span>}
           {recipe.servings && <span className="meta">🍽 {recipe.servings} port</span>}
+          {recipe.source && <span className="meta">{recipe.source}</span>}
           <h3>{recipe.name}</h3>
         </div>
         <button
@@ -118,6 +123,11 @@ export function RecipeCard({ recipe, state, actions, defaultOpen = false, big = 
 
       {cooked && <p className="meta cooked">Senast lagad {cooked}</p>}
 
+      {!hasDetails && recipe.link && (
+        <a className="link-btn" href={recipe.link} target="_blank" rel="noreferrer">
+          Visa receptet{recipe.source ? ` på ${recipe.source}` : ''} ↗
+        </a>
+      )}
       {hasDetails && (
         <button className="link-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? 'Dölj recept' : 'Visa recept'}
@@ -154,6 +164,7 @@ export function RecipeCard({ recipe, state, actions, defaultOpen = false, big = 
           )}
         </div>
       )}
+      {extra}
     </article>
   )
 }

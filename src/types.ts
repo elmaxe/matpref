@@ -17,6 +17,10 @@ export interface Recipe {
   ingredients?: string[]
   steps?: string[]
   link?: string
+  /** Bild, för recept från nätet. */
+  image?: string
+  /** Sajten receptet kommer från, t.ex. ICA. */
+  source?: string
 }
 
 export type PersonId = 'a' | 'b'

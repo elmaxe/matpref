@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { recipes } from './recipes'
+import { useEffect, useMemo, useState } from 'react'
+import { recipes as ownRecipes } from './recipes'
+import { toRecipe, useServer } from './server'
 import { PREVIEW_LABEL, decodeState, useAppState } from './storage'
 import type { AppState, Filters } from './types'
 import { FavoritesView, InspirationView, PeopleView, RandomView, RecipesView } from './views'
@@ -37,6 +38,12 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('random')
   const [filters, setFilters] = useState<Filters>({ categories: [], who: 'both', source: 'all' })
   const [pendingImport, setPendingImport] = useState(readImport)
+  const server = useServer()
+  // Rätter ni har matchat på från nätet blir vanliga recept: de kan slumpas, gillas och bli favoriter.
+  const recipes = useMemo(
+    () => [...ownRecipes, ...server.matches.map((m) => toRecipe(m.recipe))].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
+    [server.matches],
+  )
 
   useEffect(() => {
     if (location.hash.startsWith('#import=')) history.replaceState(null, '', location.pathname + location.search)
@@ -85,8 +92,8 @@ export default function App() {
         {tab === 'random' && <RandomView {...props} filters={filters} setFilters={setFilters} />}
         {tab === 'recipes' && <RecipesView {...props} />}
         {tab === 'favorites' && <FavoritesView {...props} onRoll={() => rollFrom('favorites')} />}
-        {tab === 'new' && <InspirationView {...props} onRoll={() => rollFrom('new')} />}
-        {tab === 'people' && <PeopleView {...props} />}
+        {tab === 'new' && <InspirationView {...props} server={server} onRoll={() => rollFrom('new')} />}
+        {tab === 'people' && <PeopleView {...props} server={server} />}
       </main>
 
       <nav className="tabs">

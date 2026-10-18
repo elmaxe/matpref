@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { CategoryChips, RecipeCard, RecipeList, Segmented, categoryLabel, displayName } from './components'
 import { candidates, isNew, pick } from './random'
 import { newRecipeUrl } from './recipes'
+import type { Server } from './server'
+import { WEB_PREFIX, isConfigured } from './server'
 import type { Actions } from './storage'
 import { decodeState, encodeState } from './storage'
 import type { AppState, Category, Filters, PersonId, Recipe, Source, Who } from './types'
 import { PERSON_IDS } from './types'
+import { Matches, ServerPanel, SwipeDeck } from './swipe'
 
 interface ViewProps {
   recipes: Recipe[]
@@ -166,10 +169,20 @@ export function FavoritesView({ recipes, state, actions, onRoll }: ViewProps & {
   )
 }
 
-export function InspirationView({ recipes, state, actions, onRoll }: ViewProps & { onRoll: () => void }) {
-  const list = recipes.filter((r) => isNew(r, state))
+export function InspirationView({ recipes, state, actions, server, onRoll }: ViewProps & { server: Server; onRoll: () => void }) {
+  // Matchningarna visas för sig, så här blir det bara era egna recept.
+  const list = recipes.filter((r) => isNew(r, state) && !r.id.startsWith(WEB_PREFIX))
   return (
     <section>
+      {isConfigured(server.settings) ? (
+        <SwipeDeck server={server} state={state} />
+      ) : (
+        <div className="panel intro">
+          <p>Vill ni swipea recept från nätet och se vad ni båda gillar? Koppla in en server under fliken Vi.</p>
+        </div>
+      )}
+      <Matches server={server} state={state} actions={actions} />
+      <h2 className="section-title">Nytt för er</h2>
       <div className="panel intro">
         <p>Rätter som ingen av er har testat eller tyckt till om än. Dags att prova något nytt?</p>
         {list.length > 1 && (
@@ -189,12 +202,13 @@ export function InspirationView({ recipes, state, actions, onRoll }: ViewProps &
   )
 }
 
-export function PeopleView({ recipes, state, actions }: ViewProps) {
+export function PeopleView({ recipes, state, actions, server }: ViewProps & { server: Server }) {
   return (
     <section>
       {PERSON_IDS.map((p) => (
         <PersonPanel key={p} person={p} recipes={recipes} state={state} actions={actions} />
       ))}
+      <ServerPanel server={server} state={state} />
       <SyncPanel state={state} actions={actions} />
     </section>
   )
