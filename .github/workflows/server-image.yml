@@ -1,13 +1,14 @@
 name: Server-image
 
 # Bygger Docker-imagen för servern (x64 och arm64, för de flesta NAS:ar).
-# På main läggs den upp som ghcr.io/<användare>/matpref-server:latest. På PR:er byggs den bara, för att se att den går att bygga.
+# På main läggs den upp som ghcr.io/<användare>/matpref-server:latest och startas sedan om på TrueNAS
+# (om det är inställt, se "Uppdatera av sig själv" i server/README.md). På PR:er byggs den bara, för att se att den går att bygga.
 on:
   push:
     branches: [main]
-    paths: ['server/**', '.github/workflows/server-image.yml']
+    paths: ['server/**', 'scripts/truenas-redeploy.mjs', '.github/workflows/server-image.yml']
   pull_request:
-    paths: ['server/**', '.github/workflows/server-image.yml']
+    paths: ['server/**', 'scripts/truenas-redeploy.mjs', '.github/workflows/server-image.yml']
   workflow_dispatch:
 
 permissions:
@@ -46,3 +47,30 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: image
+    # Hoppas över tills variabeln TRUENAS_URL finns i repots inställningar.
+    if: github.event_name != 'pull_request' && vars.TRUENAS_URL != ''
+    runs-on: ubuntu-latest
+    # Två merges tätt efter varandra startar om servern en i taget, inte samtidigt.
+    concurrency:
+      group: truenas-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Ansluter till ert tailnet som en tillfällig maskin, som försvinner när jobbet är klart.
+      - uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - run: node scripts/truenas-redeploy.mjs
+        env:
+          TRUENAS_URL: ${{ vars.TRUENAS_URL }}
+          TRUENAS_API_KEY: ${{ secrets.TRUENAS_API_KEY }}
+          TRUENAS_APP: ${{ vars.TRUENAS_APP || 'matpref' }}
+          NODE_TLS_REJECT_UNAUTHORIZED: ${{ vars.TRUENAS_SKIP_TLS_VERIFY == 'true' && '0' || '1' }}
