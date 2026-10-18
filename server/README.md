@@ -13,7 +13,7 @@ Resten av appen fungerar som förut utan server.
 
 ## Starta på NAS:en
 
-Kopiera [`docker-compose.yml`](docker-compose.yml) till NAS:en och kör:
+Kör ni Tailscale, hoppa till [nästa avsnitt](#appen-behöver-en-https-adress) och använd `docker-compose.tailscale.yml`. Annars: kopiera [`docker-compose.yml`](docker-compose.yml) till NAS:en och kör:
 
 ```sh
 docker compose up -d
@@ -27,11 +27,13 @@ Databasen ligger i volymen `matpref-data` (`/data/matpref.db` i containern). Kol
 
 Appen ligger på `https://elmaxe.github.io`, och en https-sida får inte anropa en `http://`-adress. Webbläsaren stoppar det (*mixed content*) innan anropet når servern, även om ni är på samma nätverk. Så `http://192.168.1.10:8080` fungerar inte i appen, utan servern behöver nås via https med ett giltigt certifikat. Några sätt, från enklast:
 
-1. **Tailscale.** Om er VPN är Tailscale: slå på *MagicDNS* och *HTTPS Certificates* under DNS i Tailscales admin, och kör sedan på NAS:en:
-   ```sh
-   tailscale serve --bg 8080
-   ```
-   Då nås servern på `https://<nas-namn>.<ert-tailnet>.ts.net` med ett riktigt certifikat, bara inifrån ert tailnet. Det är adressen ni skriver in i appen.
+1. **Tailscale.** Slå först på *MagicDNS* och *HTTPS Certificates* under [DNS i Tailscales admin](https://login.tailscale.com/admin/dns). Sedan finns två sätt:
+   - **Tailscale i compose-filen (rekommenderas).** Använd [`docker-compose.tailscale.yml`](docker-compose.tailscale.yml) i stället för `docker-compose.yml`. Då blir servern en egen maskin i ert tailnet, med certifikat som förnyas av sig själv, oavsett vad NAS:en kör. Skapa en auth key under [Settings → Keys](https://login.tailscale.com/admin/settings/keys), kopiera hela `server/`-mappen (compose-filen och `tailscale/serve.json`) till NAS:en och kör:
+     ```sh
+     TS_AUTHKEY=tskey-auth-... docker compose -f docker-compose.tailscale.yml up -d
+     ```
+     Adressen blir `https://matpref.<ert-tailnet>.ts.net` (namnet på ert tailnet står överst på DNS-sidan). Nyckeln behövs bara första gången.
+   - **Tailscale direkt på NAS:en.** Om NAS:en redan är med i tailnetet kan den köra vanliga `docker-compose.yml` och sedan `tailscale serve --bg 8080`. Adressen blir då `https://<nas-namn>.<ert-tailnet>.ts.net`.
 2. **NAS:ens egen reverse proxy.** Synology (*Inloggningsportal → Avancerat → Omvänd proxy*) och QNAP har en inbyggd. Peka en https-adress på `localhost:8080` och ge den ett Let's Encrypt-certifikat, till exempel för Synologys gratis DDNS-namn (`<namn>.synology.me`) eller en egen domän.
 3. **Caddy eller Traefik** framför containern med ett eget domännamn och Let's Encrypt via DNS-utmaning, om ni redan kör något sådant.
 

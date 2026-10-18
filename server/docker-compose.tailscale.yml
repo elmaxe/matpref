@@ -1,0 +1,36 @@
+# Servern med Tailscale inbyggt: den blir en egen maskin i ert tailnet med https-adressen
+# https://matpref.<ert-tailnet>.ts.net och syns inte utanför tailnetet. Se README.md.
+#
+# Kör med: TS_AUTHKEY=tskey-auth-... docker compose -f docker-compose.tailscale.yml up -d
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: matpref
+    restart: unless-stopped
+    environment:
+      # Behövs bara första gången. Därefter ligger inloggningen i volymen ts-state.
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - ts-state:/var/lib/tailscale
+      - ./tailscale:/config:ro
+
+  matpref:
+    image: ghcr.io/elmaxe/matpref-server:latest
+    # build: .
+    restart: unless-stopped
+    # Delar nätverk med tailscale-containern, så den nås bara via https-adressen ovan.
+    network_mode: service:tailscale
+    depends_on:
+      - tailscale
+    volumes:
+      - matpref-data:/data
+    environment:
+      Matpref__Token: ""
+      Matpref__AllowedOrigins__0: "https://elmaxe.github.io"
+      TZ: Europe/Stockholm
+
+volumes:
+  ts-state:
+  matpref-data:
