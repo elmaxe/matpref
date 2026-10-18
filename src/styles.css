@@ -128,7 +128,15 @@ h1 {
 
 .versions {
   margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-variant-numeric: tabular-nums;
+}
+
+.versions p {
+  margin: 0;
 }
 
 .sr-only {

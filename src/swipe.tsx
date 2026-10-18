@@ -291,6 +291,13 @@ export function WhoAmI({ store, state, first }: { store: Store; state: AppState;
   )
 }
 
+const CopyIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </svg>
+)
+
 /** Inställningar och status för servern, under fliken Vi. */
 export function ServerPanel({ store, syncer }: { store: Store; syncer: Syncer }) {
   const status = useSyncStatus(syncer)
@@ -386,17 +393,24 @@ export function ServerPanel({ store, syncer }: { store: Store; syncer: Syncer })
         </>
       )}
       {info && <p className="meta">{info}</p>}
-      <p className="meta versions">
-        {versionText.split('\n').map((line, i) => (
-          <span key={i}>
-            {i > 0 && <br />}
-            {line}
-          </span>
-        ))}
-      </p>
-      <button className="link-btn muted" onClick={copyVersions}>
-        {copied ? 'Kopierat' : 'Kopiera versionerna'}
-      </button>
+      <div className="versions">
+        <p className="meta">
+          {versionText.split('\n').map((line, i) => (
+            <span key={i}>
+              {i > 0 && <br />}
+              {line}
+            </span>
+          ))}
+        </p>
+        <button
+          className="icon-btn small"
+          onClick={copyVersions}
+          aria-label={copied ? 'Kopierat' : 'Kopiera versionerna'}
+          title={copied ? 'Kopierat' : 'Kopiera versionerna'}
+        >
+          {copied ? '✓' : <CopyIcon />}
+        </button>
+      </div>
     </div>
   )
 }
