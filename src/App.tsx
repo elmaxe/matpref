@@ -4,7 +4,7 @@ import type { Syncer } from './server'
 import { toRecipe } from './server'
 import { PREVIEW_LABEL, decodeState, useAppState } from './storage'
 import type { Store } from './store'
-import { allWebRecipes } from './swipe'
+import { WhoAmI, allWebRecipes } from './swipe'
 import type { AppState, Filters } from './types'
 import { FavoritesView, InspirationView, PeopleView, RandomView, RecipesView } from './views'
 
@@ -91,6 +91,8 @@ export default function App({ store, syncer }: { store: Store; syncer: Syncer })
             </div>
           </div>
         )}
+
+        {!store.meta.meChosen && <WhoAmI store={store} state={state} first />}
 
         {tab === 'random' && <RandomView {...props} filters={filters} setFilters={setFilters} />}
         {tab === 'recipes' && <RecipesView {...props} />}

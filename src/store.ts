@@ -39,8 +39,9 @@ export interface ServerSettings {
 
 export interface Meta {
   deviceId: string
-  /** Vem som använder den här telefonen (och swipar). */
+  /** Vem som använder den här telefonen (och swipar). Väljs en gång per telefon, ingen inloggning. */
   me: PersonId
+  meChosen?: boolean
   server: ServerSettings
   /** Serverns databas-id och hur långt vi har synkat. */
   databaseId?: string
@@ -202,12 +203,12 @@ export class Store {
 
   /** Rensar allt på den här telefonen. Med server hämtas det som finns där igen vid nästa synk. */
   async reset() {
-    const { deviceId, server, me } = this.meta
+    const { deviceId, server, me, meChosen } = this.meta
     this.entries.clear()
     this.recipes.clear()
     this.pendingEntries.clear()
     this.pendingRecipes.clear()
-    this.meta = { ...defaultMeta(), deviceId, server, me, migrated: true }
+    this.meta = { ...defaultMeta(), deviceId, server, me, meChosen, migrated: true }
     await this.backend.clear()
     this.changed()
   }

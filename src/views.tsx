@@ -8,7 +8,7 @@ import type { Actions } from './storage'
 import { decodeState, encodeState } from './storage'
 import type { AppState, Category, Filters, PersonId, Recipe, Source, Who } from './types'
 import { PERSON_IDS } from './types'
-import { Matches, ServerPanel, SwipeDeck } from './swipe'
+import { Matches, ServerPanel, SwipeDeck, WhoAmI } from './swipe'
 
 interface ViewProps {
   recipes: Recipe[]
@@ -199,10 +199,11 @@ export function InspirationView({ recipes, state, actions, store, onRoll }: View
 export function PeopleView({ recipes, state, actions, store, syncer }: ViewProps & { store: Store; syncer: Syncer }) {
   return (
     <section>
+      <WhoAmI store={store} state={state} />
       {PERSON_IDS.map((p) => (
         <PersonPanel key={p} person={p} recipes={recipes} state={state} actions={actions} />
       ))}
-      <ServerPanel store={store} syncer={syncer} state={state} />
+      <ServerPanel store={store} syncer={syncer} />
       <SyncPanel state={state} actions={actions} />
     </section>
   )

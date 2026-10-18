@@ -101,7 +101,7 @@ export async function openStore(): Promise<Store> {
         store.applyRemote(main.entries)
         store.markAllDirty()
         store.addRecipes(main.recipes)
-        store.setMeta({ me: main.meta.me })
+        store.setMeta({ me: main.meta.me, meChosen: main.meta.meChosen })
         copied = true
       }
     } catch {
@@ -113,7 +113,7 @@ export async function openStore(): Promise<Store> {
     if (old) store.importState(sanitize(old))
     const server = readLocal('matpref:server') as { url?: string; token?: string; me?: PersonId } | undefined
     if (!PREVIEW_LABEL && server?.url) store.setMeta({ server: { url: server.url, token: server.token ?? '' } })
-    if (server?.me === 'a' || server?.me === 'b') store.setMeta({ me: server.me })
+    if (server?.me === 'a' || server?.me === 'b') store.setMeta({ me: server.me, meChosen: true })
   }
   store.setMeta({ migrated: true })
   await store.flush()

@@ -9,7 +9,7 @@ Utan server visar Inspiration en liten lek med exempelrecept, så att ni kan tes
 ## Hur leken fungerar
 
 - Servern hämtar recept från **ICA, Arla, Coop och Köket.se**. Den läser sajternas egna sitemaps, väljer slumpvis bland receptsidorna och sparar bara titel, bild, kort beskrivning, tid, antal portioner och länk. Själva receptet läser ni på sajten.
-- Bara middagsmat kommer med: efterrätter, bakning, drycker och tillbehör sorteras bort. Varje rätt får en gissad kategori (Fast, Storkok eller Finmiddag).
+- Bara middagsmat kommer med: efterrätter, bakning, drycker och tillbehör sorteras bort. Varje rätt får en gissad kategori (Snabbt, Storkok eller Finmiddag).
 - **Servern bestämmer ordningen**: varje recept får en slumpad plats i leken när det importeras, och den är densamma för er båda. Telefonen hämtar recepten och visar dem i den ordningen, men först de rätter den andra redan har sagt ja till (där kan det bli match direkt). Det den andra har sagt nej till visas inte, eftersom det ändå inte kan bli match.
 - **Match** blir det när ni båda har swipat höger. Det märks direkt på telefonen som swipar sist, och på den andra vid nästa synk.
 - Importen kör var 12:e timme men hämtar bara när det finns färre än 150 rätter kvar som någon av er inte har swipat, högst 40 nya per sajt och med en paus mellan varje sida. Den första körningen sker när servern startar och tar upp till tio minuter.

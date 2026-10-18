@@ -84,12 +84,17 @@ export function SwipeDeck({ store, state }: { store: Store; state: AppState }) {
           den andra och se en match. Koppla in en server under Vi för riktiga recept och synk mellan telefonerna.
         </p>
       )}
-      <Segmented
-        label="Vem swipar?"
-        options={PERSON_IDS.map((p) => ({ id: p, label: displayName(state, p) }))}
-        value={me}
-        onChange={(p) => store.setMeta({ me: p })}
-      />
+      {demo ? (
+        // Utan server finns bara den här telefonen, så låt den swipea som båda för att testa.
+        <Segmented
+          label="Testa som"
+          options={PERSON_IDS.map((p) => ({ id: p, label: displayName(state, p) }))}
+          value={me}
+          onChange={(p) => store.setMeta({ me: p })}
+        />
+      ) : (
+        <p className="meta">Du swipar som {displayName(state, me)}. Byt under Vi.</p>
+      )}
       <Segmented label="Vad blir det?" options={categoryOptions} value={category} onChange={setCategory} />
 
       {top ? (
@@ -210,8 +215,41 @@ export function Matches({ store, state, actions }: { store: Store; state: AppSta
 const time = (ms: number) =>
   new Date(ms).toLocaleString('sv-SE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
 
+/**
+ * Vem som använder telefonen. Ingen inloggning: servern ska bara gå att nå via ert VPN, och det räcker att varje telefon
+ * vet vem den tillhör. Visas som en fråga första gången och går att ändra under Vi.
+ */
+export function WhoAmI({ store, state, first }: { store: Store; state: AppState; first?: boolean }) {
+  const choose = (me: PersonId) => store.setMeta({ me, meChosen: true })
+  if (first) {
+    return (
+      <div className="panel notice">
+        <h3>Vem är du?</h3>
+        <p className="meta">Det sparas på den här telefonen, så att dina swipes och betyg blir dina. Namnen ändrar ni under Vi.</p>
+        <div className="row">
+          {PERSON_IDS.map((p) => (
+            <button key={p} className="primary" onClick={() => choose(p)}>
+              {displayName(state, p)}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="panel">
+      <Segmented
+        label="Den här telefonen tillhör"
+        options={PERSON_IDS.map((p) => ({ id: p, label: displayName(state, p) }))}
+        value={store.meta.me}
+        onChange={choose}
+      />
+    </div>
+  )
+}
+
 /** Inställningar och status för servern, under fliken Vi. */
-export function ServerPanel({ store, syncer, state }: { store: Store; syncer: Syncer; state: AppState }) {
+export function ServerPanel({ store, syncer }: { store: Store; syncer: Syncer }) {
   const status = useSyncStatus(syncer)
   const [url, setUrl] = useState(store.meta.server.url)
   const [token, setToken] = useState(store.meta.server.token)
@@ -266,12 +304,6 @@ export function ServerPanel({ store, syncer, state }: { store: Store; syncer: Sy
         <span className="field-label">Nyckel (om servern har en)</span>
         <input type="password" value={token} onChange={(e) => setToken(e.target.value)} />
       </label>
-      <Segmented
-        label="Vem använder den här telefonen?"
-        options={PERSON_IDS.map((p) => ({ id: p, label: displayName(state, p) }))}
-        value={store.meta.me}
-        onChange={(me) => store.setMeta({ me })}
-      />
       <button className={changed ? 'primary' : ''} onClick={save} disabled={!changed && (!isConfigured(saved) || status.state === 'syncing')}>
         {changed ? (url.trim() ? 'Spara och synka' : 'Koppla från servern') : 'Synka nu'}
       </button>

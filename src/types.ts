@@ -1,7 +1,7 @@
 export type Category = 'fast' | 'storkok' | 'finmiddag'
 
 export const CATEGORIES: { id: Category; label: string; hint: string }[] = [
-  { id: 'fast', label: 'Fast', hint: 'Snabbt till vardags' },
+  { id: 'fast', label: 'Snabbt', hint: 'Går fort, till vardags' },
   { id: 'storkok', label: 'Storkok', hint: 'Stora satser, matlådor' },
   { id: 'finmiddag', label: 'Finmiddag', hint: 'När det ska vara lite extra' },
 ]
