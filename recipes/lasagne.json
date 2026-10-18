@@ -1,0 +1,26 @@
+{
+  "name": "Lasagne",
+  "category": "storkok",
+  "description": "Klassisk lasagne i stor form, räcker till matlådor.",
+  "timeMinutes": 120,
+  "servings": 8,
+  "tags": [
+    "pasta",
+    "kött",
+    "frys"
+  ],
+  "ingredients": [
+    "1 sats köttfärssås",
+    "Lasagneplattor",
+    "50 g smör",
+    "1 dl vetemjöl",
+    "1 l mjölk",
+    "Muskot",
+    "Riven ost"
+  ],
+  "steps": [
+    "Gör en bechamel av smör, mjöl och mjölk. Smaka av med salt och muskot.",
+    "Varva köttfärssås, plattor och bechamel i en form.",
+    "Toppa med ost och baka i 200 °C ca 45 minuter."
+  ]
+}

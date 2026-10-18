@@ -1,0 +1,25 @@
+{
+  "name": "Ankbröst med apelsinsås",
+  "category": "finmiddag",
+  "description": "Krispigt ankbröst med syrlig apelsinsås.",
+  "timeMinutes": 60,
+  "servings": 2,
+  "tags": [
+    "fågel",
+    "fest"
+  ],
+  "ingredients": [
+    "2 ankbröst",
+    "2 apelsiner",
+    "1 msk honung",
+    "2 dl kycklingfond",
+    "Smör",
+    "Rotfrukter till ugnen"
+  ],
+  "steps": [
+    "Rosta rotfrukter i ugnen.",
+    "Skåra skinnet och stek ankbrösten på skinnsidan i kall panna.",
+    "Avsluta i ugnen till 56 °C.",
+    "Koka ner apelsinjuice, honung och fond och montera med smör."
+  ]
+}

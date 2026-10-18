@@ -1,0 +1,24 @@
+{
+  "name": "Kycklinggryta med curry",
+  "category": "storkok",
+  "description": "Krämig gryta som blir godare dagen efter.",
+  "timeMinutes": 60,
+  "servings": 6,
+  "tags": [
+    "kyckling",
+    "frys"
+  ],
+  "ingredients": [
+    "1 kg kycklinglårfilé",
+    "2 lökar",
+    "2 paprikor",
+    "2 msk curry",
+    "5 dl matlagningsgrädde eller kokosmjölk",
+    "2 dl buljong"
+  ],
+  "steps": [
+    "Bryn kycklingen i bitar.",
+    "Fräs lök, paprika och curry.",
+    "Tillsätt grädde och buljong och låt puttra 30 minuter."
+  ]
+}

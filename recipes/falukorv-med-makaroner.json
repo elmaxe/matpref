@@ -1,0 +1,21 @@
+{
+  "name": "Stekt falukorv med makaroner",
+  "category": "fast",
+  "description": "Husmanskost när det ska gå undan.",
+  "timeMinutes": 15,
+  "servings": 3,
+  "tags": [
+    "husman"
+  ],
+  "ingredients": [
+    "1 falukorv",
+    "300 g makaroner",
+    "Ketchup",
+    "Smör"
+  ],
+  "steps": [
+    "Koka makaronerna.",
+    "Skiva och stek falukorven gyllene i smör.",
+    "Servera med ketchup."
+  ]
+}

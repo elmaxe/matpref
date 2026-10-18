@@ -1,0 +1,25 @@
+{
+  "name": "Svamprisotto",
+  "category": "finmiddag",
+  "description": "Krämig risotto med kantareller och parmesan.",
+  "timeMinutes": 45,
+  "servings": 4,
+  "tags": [
+    "vegetariskt"
+  ],
+  "ingredients": [
+    "3 dl arborioris",
+    "300 g kantareller eller champinjoner",
+    "1 schalottenlök",
+    "1 dl vitt vin",
+    "1 l grönsaksbuljong",
+    "50 g parmesan",
+    "Smör"
+  ],
+  "steps": [
+    "Stek svampen i smör och lägg åt sidan.",
+    "Fräs schalotten och riset, slå på vinet.",
+    "Tillsätt varm buljong lite i taget under omrörning i ca 18 minuter.",
+    "Rör ner parmesan, smör och svampen."
+  ]
+}

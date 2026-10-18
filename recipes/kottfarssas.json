@@ -1,0 +1,27 @@
+{
+  "name": "Köttfärssås",
+  "category": "storkok",
+  "description": "Mustig köttfärssås som räcker hela veckan och går bra att frysa.",
+  "timeMinutes": 90,
+  "servings": 8,
+  "tags": [
+    "kött",
+    "frys"
+  ],
+  "ingredients": [
+    "1 kg nötfärs",
+    "2 gula lökar",
+    "3 vitlöksklyftor",
+    "2 morötter",
+    "2 burkar krossade tomater",
+    "2 msk tomatpuré",
+    "1 dl rött vin (valfritt)",
+    "Oregano, salt, peppar"
+  ],
+  "steps": [
+    "Fräs hackad lök, vitlök och riven morot.",
+    "Bryn färsen.",
+    "Tillsätt tomatpuré, vin och krossade tomater.",
+    "Låt puttra under lock minst en timme. Smaka av."
+  ]
+}

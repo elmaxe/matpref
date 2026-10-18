@@ -1,3 +1,49 @@
 # Matpref
 
-Matrandomiserare för oss två.
+En PWA som hjälper oss att bestämma vad vi ska äta. Slumpa fram en rätt utifrån kategori, vem som äter och vad ni gillar.
+
+- **Slumpa**: välj kategori (Fast, Storkok, Finmiddag), vem som äter och om det ska vara bland alla, favoriter, gillade eller nya rätter. Rätter som någon av de som äter ogillar tas bort, gillade rätter och favoriter kommer upp oftare och sådant ni lagat den senaste veckan mer sällan.
+- **Recept**: alla rätter med sök och filter. Varje person kan sätta 👍 eller 👎.
+- **Favoriter**: era gemensamma favoriter (♥).
+- **Inspiration**: rätter ingen av er har testat eller tyckt till om än.
+- **Vi**: namn och varje persons lista över vad den gillar och inte gillar, plus synk mellan telefoner.
+
+Appen fungerar offline och kan installeras på hemskärmen ("Lägg till på hemskärmen" i Safari eller Chrome).
+
+## Var sparas vad?
+
+- **Recepten** ligger som JSON-filer i [`recipes/`](recipes/) och byggs in i appen. Nya recept läggs till med en pull request.
+- **Preferenser, favoriter och vad ni har lagat** sparas i webbläsarens `localStorage` på varje enhet. Under fliken *Vi* kan du dela en länk som slår ihop listorna på den andra telefonen.
+
+## Lägga till ett recept
+
+Enklast är knappen *Lägg till recept på GitHub* i appen, som öppnar en ny fil med en mall. Annars: skapa `recipes/<namn-med-bindestreck>.json` och öppna en PR.
+
+```json
+{
+  "name": "Pasta carbonara",
+  "category": "fast",
+  "description": "Krämig klassiker med ägg, pecorino och sidfläsk.",
+  "timeMinutes": 20,
+  "servings": 2,
+  "tags": ["pasta"],
+  "ingredients": ["250 g spaghetti", "2 ägg"],
+  "steps": ["Koka pastan.", "Blanda med ägg och ost."],
+  "link": "https://exempel.se/recept"
+}
+```
+
+Bara `name` och `category` (`fast`, `storkok` eller `finmiddag`) krävs. Filnamnet blir receptets id, så byt inte namn på en fil i efterhand (då tappar ni betygen för den). CI kör `npm run validate` på varje PR och säger till om något är fel.
+
+## Utveckling
+
+```sh
+npm install
+npm run dev       # startar på http://localhost:5173
+npm test          # enhetstester
+npm run build     # validerar recepten, typkontrollerar och bygger till dist/
+```
+
+## Publicering
+
+`.github/workflows/deploy.yml` bygger och publicerar till GitHub Pages vid varje push till `main`. Slå på det en gång under *Settings → Pages → Build and deployment → Source: GitHub Actions*. Appen hamnar då på `https://<användare>.github.io/matpref/`.

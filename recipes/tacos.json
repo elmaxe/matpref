@@ -1,0 +1,23 @@
+{
+  "name": "Tacos",
+  "category": "fast",
+  "description": "Fredagsfavoriten med köttfärs och alla tillbehör.",
+  "timeMinutes": 30,
+  "servings": 4,
+  "tags": [
+    "kött",
+    "fredag"
+  ],
+  "ingredients": [
+    "500 g nötfärs",
+    "1 påse tacokrydda",
+    "8 tortillabröd",
+    "Isbergssallad, tomat, gurka",
+    "Riven ost, gräddfil, salsa"
+  ],
+  "steps": [
+    "Bryn färsen och tillsätt kryddan och vatten enligt påsen.",
+    "Hacka grönsakerna.",
+    "Värm tortillabröden och duka fram allt."
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "Halloumisallad med couscous",
+  "category": "fast",
+  "description": "Vegetariskt, fräscht och klart på en kvart.",
+  "timeMinutes": 15,
+  "servings": 2,
+  "tags": [
+    "vegetariskt"
+  ],
+  "ingredients": [
+    "1 halloumi",
+    "2 dl couscous",
+    "Babyspenat",
+    "Cocktailtomater",
+    "Gurka",
+    "Granatäpple (valfritt)",
+    "Olivolja och citron"
+  ],
+  "steps": [
+    "Häll kokande vatten över couscousen och låt stå.",
+    "Skiva och stek halloumin.",
+    "Blanda allt med olivolja och citron."
+  ]
+}

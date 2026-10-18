@@ -1,0 +1,24 @@
+{
+  "name": "Torskrygg med brynt smör",
+  "category": "finmiddag",
+  "description": "Torskrygg med pepparrot, räkor och brynt smör.",
+  "timeMinutes": 45,
+  "servings": 4,
+  "tags": [
+    "fisk"
+  ],
+  "ingredients": [
+    "600 g torskrygg",
+    "200 g räkor",
+    "150 g smör",
+    "Färsk pepparrot",
+    "Kokt potatis",
+    "Dill"
+  ],
+  "steps": [
+    "Salta torsken och låt stå 15 minuter.",
+    "Baka torsken i 125 °C till 48 °C innertemperatur.",
+    "Bryn smöret nötbrunt.",
+    "Servera med räkor, riven pepparrot, dill och potatis."
+  ]
+}
