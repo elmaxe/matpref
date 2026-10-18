@@ -121,6 +121,43 @@ api.MapGet("/recipes", (Db db, long? after, int? limit) =>
     return new { recipes, more };
 });
 
+// Hämtar ett recept från en länk som någon klistrat in, t.ex. från ICA. Webbläsaren får inte läsa andra sajter själv
+// (CORS), så servern hämtar sidan och läser receptet ur den. Appen fyller i formuläret med svaret.
+api.MapGet("/fetch-recipe", async (string? url, Importer importer, CancellationToken ct) =>
+{
+    if (!Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var uri) || (uri.Scheme != "https" && uri.Scheme != "http"))
+        return Results.BadRequest(new { error = "Det ser inte ut som en webbadress" });
+    RecipeMeta? meta;
+    try
+    {
+        meta = await importer.FetchRecipeAsync(uri, ct);
+    }
+    catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+    {
+        var error = e switch
+        {
+            HttpRequestException { StatusCode: { } code } => $"Sidan svarade {(int)code}",
+            TaskCanceledException => "Sidan svarade inte i tid",
+            _ => "Kunde inte hämta sidan",
+        };
+        return Results.Json(new { error }, statusCode: StatusCodes.Status502BadGateway);
+    }
+    if (meta is null) return Results.UnprocessableEntity(new { error = "Hittade inget recept på sidan" });
+    return Results.Ok(new
+    {
+        name = meta.Title,
+        category = Classifier.GuessCategory(meta),
+        description = meta.Description,
+        image = meta.Image,
+        timeMinutes = meta.TotalMinutes,
+        servings = meta.Servings,
+        ingredients = meta.Ingredients ?? [],
+        steps = meta.Steps ?? [],
+        tags = meta.Keywords.Select(k => k.ToLowerInvariant()).Take(5),
+        link = uri.ToString(),
+    });
+});
+
 // Starta en import direkt i stället för att vänta på nästa schemalagda.
 api.MapPost("/import", (Importer importer, IHostApplicationLifetime life) =>
 {

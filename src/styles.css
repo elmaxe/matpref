@@ -713,3 +713,8 @@ a.link-btn {
   background: var(--accent-soft);
   font-size: 0.9rem;
 }
+
+.add form.row input {
+  flex: 1;
+  min-width: 0;
+}

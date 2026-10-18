@@ -71,7 +71,7 @@ export function RecipeForm({
   onCancel,
   onDelete,
 }: {
-  recipe?: Recipe
+  recipe?: Omit<Recipe, 'id'> & { id?: string }
   onSave: (r: Omit<Recipe, 'id'> & { id?: string }) => void
   onCancel: () => void
   onDelete?: () => void
@@ -102,6 +102,7 @@ export function RecipeForm({
       steps: lines(steps),
       tags: tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
       link: link.trim() || undefined,
+      image: recipe?.image,
     })
   }
 

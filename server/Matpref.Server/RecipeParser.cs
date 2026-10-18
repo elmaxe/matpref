@@ -5,7 +5,10 @@ using System.Xml;
 
 namespace Matpref.Server;
 
-/// <summary>Det vi sparar om ett recept: bara metadata och en länk, aldrig själva receptet.</summary>
+/// <summary>
+/// Det en receptsida säger om receptet. Kortleken sparar bara metadata och en länk. Ingredienser och steg läses bara när
+/// någon själv lägger till ett recept från en länk (GET /api/fetch-recipe), och sparas då i deras egen databas.
+/// </summary>
 public record RecipeMeta(
     string Url,
     string Title,
@@ -14,7 +17,9 @@ public record RecipeMeta(
     int? TotalMinutes,
     int? Servings,
     string[] Categories,
-    string[] Keywords);
+    string[] Keywords,
+    string[]? Ingredients = null,
+    string[]? Steps = null);
 
 /// <summary>Läser receptdata ur en receptsida. Nästan alla receptsajter lägger schema.org/Recipe som JSON-LD för Googles skull.</summary>
 public static partial class RecipeParser
@@ -70,8 +75,25 @@ public static partial class RecipeParser
             TotalMinutes: total is > 0 ? total : null,
             Servings: r.TryGetProperty("recipeYield", out var y) ? FirstNumber(y) : null,
             Categories: List(r, "recipeCategory"),
-            Keywords: List(r, "keywords"));
+            Keywords: List(r, "keywords"),
+            Ingredients: r.TryGetProperty("recipeIngredient", out var ing)
+                ? Strings(ing).Select(s => Clean(s, 200)).OfType<string>().Take(100).ToArray()
+                : [],
+            Steps: r.TryGetProperty("recipeInstructions", out var ins)
+                ? Instructions(ins).Select(s => Clean(s, 1000)).OfType<string>().Take(100).ToArray()
+                : []);
     }
+
+    /// <summary>Stegen kan vara en text, en lista med texter, HowToStep-objekt eller HowToSection med steg i.</summary>
+    static IEnumerable<string> Instructions(JsonElement v) => v.ValueKind switch
+    {
+        // En enda text: ofta ett steg per rad, ibland HTML med ett stycke eller listpunkt per steg.
+        JsonValueKind.String => StepBreakRegex().Split(v.GetString()!),
+        JsonValueKind.Array => v.EnumerateArray().SelectMany(Instructions),
+        JsonValueKind.Object when v.TryGetProperty("itemListElement", out var items) => Instructions(items),
+        JsonValueKind.Object => (Str(v, "text") ?? Str(v, "name")) is { } t ? [t] : [],
+        _ => [],
+    };
 
     /// <summary>Reserv för sidor utan JSON-LD: Open Graph, men bara om sidan själv säger att den är ett recept.</summary>
     static RecipeMeta? FromOpenGraph(string html, string pageUrl)
@@ -151,6 +173,8 @@ public static partial class RecipeParser
     {
         if (s is null) return null;
         s = WhitespaceRegex().Replace(TagRegex().Replace(WebUtility.HtmlDecode(s), " "), " ").Trim();
+        // "med <b>mjölk</b>." blir annars "med mjölk ."
+        s = SpaceBeforePunctuationRegex().Replace(s, "$1");
         if (s.Length == 0) return null;
         return s.Length <= max ? s : s[..(max - 1)].TrimEnd() + "…";
     }
@@ -164,11 +188,17 @@ public static partial class RecipeParser
     [GeneratedRegex(@"([\w:-]+)\s*=\s*([""'])(.*?)\2", RegexOptions.Singleline)]
     private static partial Regex AttrRegex();
 
+    [GeneratedRegex(@"\r?\n|</p>|</li>|<br\s*/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex StepBreakRegex();
+
     [GeneratedRegex(@"\d+")]
     private static partial Regex NumberRegex();
 
     [GeneratedRegex(@"<[^>]+>")]
     private static partial Regex TagRegex();
+
+    [GeneratedRegex(@"\s+([.,;:!?])")]
+    private static partial Regex SpaceBeforePunctuationRegex();
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRegex();

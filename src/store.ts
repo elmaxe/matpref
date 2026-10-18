@@ -65,6 +65,7 @@ export function recipeValue(r: Recipe): Json {
   if (r.ingredients?.length) v.ingredients = r.ingredients
   if (r.steps?.length) v.steps = r.steps
   if (r.link?.trim()) v.link = r.link.trim()
+  if (r.image) v.image = r.image
   return v
 }
 
@@ -86,6 +87,7 @@ export function parseRecipe(id: string, v: Json): Recipe | undefined {
     ingredients: strings(v.ingredients),
     steps: strings(v.steps),
     link: typeof v.link === 'string' ? v.link : undefined,
+    image: typeof v.image === 'string' ? v.image : undefined,
   }
 }
 

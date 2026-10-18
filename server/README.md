@@ -102,6 +102,7 @@ Har servern en nyckel måste alla anrop under `/api` skicka den, som headern `X-
 | `GET /api/version` | Vilken version servern kör (commitens korta hash) och när den byggdes. Visas i appen under Vi. |
 | `POST /api/sync` `{ "databaseId", "cursor", "changes": [{ "key", "value", "updatedAt", "device" }] }` | Skicka telefonens ändringar och få allt nytt sedan `cursor`. Nycklar: `name/a`, `rating/a/<recept>`, `favorite/<recept>`, `cooked/<recept>`, `swipe/a/<recept>`, `hidden/<recept>`, `recipe/<recept>` (själva receptet). |
 | `GET /api/recipes?after=<id>&limit=500` | Recept från nätet med id större än `after`, med sin plats (`rank`) i leken. |
+| `GET /api/fetch-recipe?url=<länk>` | Hämtar en receptsida och läser ut receptet (namn, ingredienser, steg osv.) ur dess schema.org-data. Används när man lägger till ett recept från en länk i appen. |
 | `POST /api/import` | Kör en import nu. |
 
 ## Utveckling

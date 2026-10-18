@@ -19,7 +19,7 @@ Appen fungerar offline och kan installeras på hemskärmen ("Lägg till på hems
 
 ## Lägga till ett recept
 
-Under *Recept*: tryck *Lägg till rätt* längst ned. Ett recept ändras eller tas bort med *Ändra receptet* på kortet. Med server synkas det till den andra telefonen.
+Under *Recept*, längst ned: klistra in en länk till ett recept (t.ex. från ICA) och tryck *Hämta*, så fyller servern i formuläret åt dig. Kräver en server, eftersom webbläsaren inte får läsa andra sajter. Eller tryck *Skriv in själv*. Ett recept ändras eller tas bort med *Ändra receptet* på kortet. Med server synkas det till den andra telefonen.
 
 Grundrecepten i `recipes/` är JSON-filer i det här formatet. Bara `name` och `category` (`fast`, `storkok` eller `finmiddag`) krävs, och filnamnet blir receptets id. En ny fil där dyker upp i appen efter nästa publicering, om det inte redan finns ett recept med samma id i databasen. CI kör `npm run validate` på varje PR.
 

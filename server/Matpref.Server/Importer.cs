@@ -125,6 +125,10 @@ public class Importer(Db db, HttpClient http, IOptionsMonitor<ImportOptions> opt
         }
     }
 
+    /// <summary>Hämtar en enskild receptsida som någon har klistrat in en länk till. Null om sidan inte har något recept.</summary>
+    public async Task<RecipeMeta?> FetchRecipeAsync(Uri url, CancellationToken ct) =>
+        RecipeParser.Parse(await GetStringAsync(url.ToString(), ct), url.ToString());
+
     const int MaxPageBytes = 3_000_000;
 
     async Task<byte[]> GetBytesAsync(string url, CancellationToken ct)

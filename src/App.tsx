@@ -97,7 +97,7 @@ export default function App({ store, syncer }: { store: Store; syncer: Syncer })
         {!store.meta.meChosen && <WhoAmI store={store} state={state} first />}
 
         {tab === 'random' && <RandomView {...props} filters={filters} setFilters={setFilters} />}
-        {tab === 'recipes' && <RecipesView {...props} />}
+        {tab === 'recipes' && <RecipesView {...props} store={store} />}
         {tab === 'favorites' && <FavoritesView {...props} onRoll={() => rollFrom('favorites')} />}
         {tab === 'new' && <InspirationView {...props} store={store} onRoll={() => rollFrom('new')} />}
         {tab === 'people' && <PeopleView {...props} store={store} syncer={syncer} />}
