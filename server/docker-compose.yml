@@ -1,0 +1,20 @@
+# Exempel för NAS:en. Kör med: docker compose up -d
+services:
+  matpref:
+    image: ghcr.io/elmaxe/matpref-server:latest
+    # Eller bygg själv från repot i stället för att hämta färdig image:
+    # build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - matpref-data:/data
+    environment:
+      # Valfritt: en delad nyckel som appen måste skicka (fylls i under Vi → Server för swipe).
+      Matpref__Token: ""
+      # Adresser som får anropa servern från en webbläsare. Lägg till din egen om appen ligger någon annanstans.
+      Matpref__AllowedOrigins__0: "https://elmaxe.github.io"
+      TZ: Europe/Stockholm
+
+volumes:
+  matpref-data:

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Matpref.Server.Tests/Matpref.Server.Tests.csproj" />
+  <Project Path="Matpref.Server/Matpref.Server.csproj" />
+</Solution>
