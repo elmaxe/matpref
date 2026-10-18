@@ -71,4 +71,29 @@ public sealed class ImporterTests : IDisposable
         Assert.Equal(0, await importer.RunAsync(force: true, CancellationToken.None));
         Assert.Equal(["https://x.se/sitemap.xml", "https://x.se/sitemaps/recipes/1", "https://x.se/recept/borta-3/"], site.Requested);
     }
+
+    [Fact]
+    public async Task Fetches_a_whole_recipe_from_a_pasted_link()
+    {
+        var url = "https://www.ica.se/recept/pannkakor-123/";
+        var page = """
+            <script type="application/ld+json">{"@type":"Recipe","name":"Pannkakor","recipeYield":"4",
+             "recipeIngredient":["3 dl vetemjöl","6 dl mjölk","3 &auml;gg"],
+             "recipeInstructions":[
+               {"@type":"HowToSection","name":"Smet","itemListElement":[{"@type":"HowToStep","text":"Vispa mjöl och <b>mjölk</b>."},{"@type":"HowToStep","text":"Vispa i äggen."}]},
+               {"@type":"HowToStep","text":"Stek tunna pannkakor."}]}</script>
+            """;
+        var site = new FakeSite(new() { [url] = page, ["https://x.se/text"] = """<script type="application/ld+json">{"@type":"Recipe","name":"Gröt","recipeInstructions":"<p>Koka vatten.</p><p>Rör i havre.</p>"}</script>""" });
+        var db = new Db(Path.Combine(_dir, "f.db"));
+        var importer = new Importer(db, new HttpClient(site), new Monitor(new ImportOptions()), NullLogger<Importer>.Instance);
+
+        var r = (await importer.FetchRecipeAsync(new Uri(url), CancellationToken.None))!;
+        Assert.Equal("Pannkakor", r.Title);
+        Assert.Equal(["3 dl vetemjöl", "6 dl mjölk", "3 ägg"], r.Ingredients!);
+        Assert.Equal(["Vispa mjöl och mjölk.", "Vispa i äggen.", "Stek tunna pannkakor."], r.Steps!);
+
+        var porridge = (await importer.FetchRecipeAsync(new Uri("https://x.se/text"), CancellationToken.None))!;
+        Assert.Equal(["Koka vatten.", "Rör i havre."], porridge.Steps!);
+        Assert.Empty(db.Recipes(0, 10).Recipes);
+    }
 }

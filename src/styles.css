@@ -192,13 +192,31 @@ button.danger {
   background: none;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);
+}
+
+textarea {
+  padding: 10px 14px;
+  font: inherit;
+  color: inherit;
+  resize: vertical;
+}
+
+.recipe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recipe-form .row > .field {
+  flex: 1;
 }
 
 .panel,
@@ -694,4 +712,9 @@ a.link-btn {
   border-radius: 10px;
   background: var(--accent-soft);
   font-size: 0.9rem;
+}
+
+.add form.row input {
+  flex: 1;
+  min-width: 0;
 }

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { recipes as ownRecipes } from './recipes'
 import type { Syncer } from './server'
 import { toRecipe } from './server'
 import { PREVIEW_LABEL, decodeState, useAppState } from './storage'
@@ -43,7 +42,7 @@ export default function App({ store, syncer }: { store: Store; syncer: Syncer })
   const [pendingImport, setPendingImport] = useState(readImport)
   // Rätter ni har matchat på från nätet blir vanliga recept: de kan slumpas, gillas och bli favoriter.
   const recipes = useMemo(
-    () => [...ownRecipes, ...store.matches(allWebRecipes(store)).map(toRecipe)].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
+    () => [...store.ownRecipes(), ...store.matches(allWebRecipes(store)).map(toRecipe)].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
     // Räkna om när databasen ändras.
     [store, state],
   )
@@ -98,7 +97,7 @@ export default function App({ store, syncer }: { store: Store; syncer: Syncer })
         {!store.meta.meChosen && <WhoAmI store={store} state={state} first />}
 
         {tab === 'random' && <RandomView {...props} filters={filters} setFilters={setFilters} />}
-        {tab === 'recipes' && <RecipesView {...props} />}
+        {tab === 'recipes' && <RecipesView {...props} store={store} />}
         {tab === 'favorites' && <FavoritesView {...props} onRoll={() => rollFrom('favorites')} />}
         {tab === 'new' && <InspirationView {...props} store={store} onRoll={() => rollFrom('new')} />}
         {tab === 'people' && <PeopleView {...props} store={store} syncer={syncer} />}

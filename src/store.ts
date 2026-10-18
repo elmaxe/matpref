@@ -1,11 +1,11 @@
-import type { AppState, Category, PersonId, Rating } from './types'
-import { PERSON_IDS } from './types'
+import type { AppState, Category, PersonId, Rating, Recipe } from './types'
+import { CATEGORIES, PERSON_IDS } from './types'
 
 // Den lokala databasen. Allt appen vet sparas här först (IndexedDB), så att den fungerar helt offline.
-// Data lagras som nycklar med senaste ändringstid, t.ex. "rating/a/lasagne" = "like". Har ni en server synkas nycklarna dit
+// Data lagras som nycklar med senaste ändringstid, t.ex. "rating/a/lasagne" = "like" eller "recipe/lasagne" = { name, ... }. Har ni en server synkas nycklarna dit
 // (se sync.ts) och den senaste ändringen av varje nyckel vinner, oavsett vilken telefon den kom från.
 
-export type Json = string | number | boolean | null
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
 
 export interface Entry {
   key: string
@@ -53,6 +53,45 @@ export interface Meta {
 export const isDemo = (id: string) => id.startsWith('demo-')
 export const webKey = (serverId: number) => `web-${serverId}`
 export const swipeKey = (p: PersonId, id: string) => `swipe/${p}/${id}`
+export const recipeKey = (id: string) => `recipe/${id}`
+
+/** Ett recept som det sparas i databasen: utan id (det står i nyckeln) och utan tomma fält. */
+export function recipeValue(r: Recipe): Json {
+  const v: { [key: string]: Json } = { name: r.name.trim(), category: r.category }
+  if (r.description?.trim()) v.description = r.description.trim()
+  if (r.timeMinutes) v.timeMinutes = r.timeMinutes
+  if (r.servings) v.servings = r.servings
+  if (r.tags?.length) v.tags = r.tags
+  if (r.ingredients?.length) v.ingredients = r.ingredients
+  if (r.steps?.length) v.steps = r.steps
+  if (r.link?.trim()) v.link = r.link.trim()
+  if (r.image) v.image = r.image
+  return v
+}
+
+const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined)
+const positive = (v: unknown) => (typeof v === 'number' && v > 0 ? v : undefined)
+
+/** Läser ett recept ur databasen. Det kan komma från en annan telefon, så allt kontrolleras. */
+export function parseRecipe(id: string, v: Json): Recipe | undefined {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return undefined
+  if (typeof v.name !== 'string' || !v.name.trim() || !CATEGORIES.some((c) => c.id === v.category)) return undefined
+  return {
+    id,
+    name: v.name,
+    category: v.category as Category,
+    description: typeof v.description === 'string' ? v.description : undefined,
+    timeMinutes: positive(v.timeMinutes),
+    servings: positive(v.servings),
+    tags: strings(v.tags),
+    ingredients: strings(v.ingredients),
+    steps: strings(v.steps),
+    link: typeof v.link === 'string' ? v.link : undefined,
+    image: typeof v.image === 'string' ? v.image : undefined,
+  }
+}
+
+const same = (a: Json, b: Json) => a === b || (typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b))
 
 const randomId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 
@@ -83,6 +122,8 @@ export class Store {
   private pendingRecipes = new Map<string, WebRecipe>()
   private saveTimer?: ReturnType<typeof setTimeout>
   private cache?: { version: number; state: AppState }
+  private recipeCache?: { version: number; list: Recipe[] }
+  private seedList: Recipe[] = []
 
   constructor(private backend: Backend = memoryBackend()) {}
 
@@ -135,7 +176,7 @@ export class Store {
   setMany(pairs: [string, Json][]) {
     let any = false
     for (const [key, value] of pairs) {
-      if (this.get(key) === value) continue
+      if (same(this.get(key), value)) continue
       const e: Entry = { key, value, updatedAt: this.now(), device: this.meta.deviceId, dirty: true }
       this.entries.set(key, e)
       this.pendingEntries.set(key, e)
@@ -210,7 +251,58 @@ export class Store {
     this.pendingRecipes.clear()
     this.meta = { ...defaultMeta(), deviceId, server, me, meChosen, migrated: true }
     await this.backend.clear()
+    this.seed(this.seedList)
     this.changed()
+  }
+
+  // Recept
+
+  /**
+   * Lägger in grundrecepten (recipes/ i repot) i databasen, de som inte redan finns där. De får tiden 1, så att en
+   * ändring eller borttagning från någon av telefonerna alltid vinner över dem.
+   */
+  seed(list: Recipe[]) {
+    this.seedList = list
+    let any = false
+    for (const r of list) {
+      const key = recipeKey(r.id)
+      if (this.entries.has(key)) continue
+      const e: Entry = { key, value: recipeValue(r), updatedAt: 1, device: 'seed', dirty: true }
+      this.entries.set(key, e)
+      this.pendingEntries.set(key, e)
+      any = true
+    }
+    if (any) this.changed()
+  }
+
+  /** Era recept, i bokstavsordning. */
+  ownRecipes(): Recipe[] {
+    if (this.recipeCache?.version === this.version) return this.recipeCache.list
+    const list: Recipe[] = []
+    for (const { key, value } of this.entries.values()) {
+      if (!key.startsWith('recipe/')) continue
+      const r = parseRecipe(key.slice('recipe/'.length), value)
+      if (r) list.push(r)
+    }
+    list.sort((a, b) => a.name.localeCompare(b.name, 'sv'))
+    this.recipeCache = { version: this.version, list }
+    return list
+  }
+
+  /** Sparar ett nytt eller ändrat recept. Ett nytt får ett id av namnet. */
+  saveRecipe(r: Omit<Recipe, 'id'> & { id?: string }): string {
+    let id = r.id
+    if (!id) {
+      const base = slug(r.name) || 'ratt'
+      id = base
+      while (this.entries.has(recipeKey(id))) id = `${base}-${Math.random().toString(36).slice(2, 6)}`
+    }
+    this.set(recipeKey(id), recipeValue({ ...r, id }))
+    return id
+  }
+
+  deleteRecipe(id: string) {
+    this.set(recipeKey(id), null)
   }
 
   /** Appens tillstånd i den form resten av appen använder. */
@@ -302,6 +394,16 @@ export class Store {
 }
 
 const isPerson = (p: string | undefined): p is PersonId => p === 'a' || p === 'b'
+
+/** "Kycklinggryta med ris" blir "kycklinggryta-med-ris". */
+const slug = (name: string) =>
+  name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
 
 /** Om ändring a är nyare än b. Lika tid avgörs av enhetens id, så att alla telefoner och servern väljer samma. */
 export const newer = (a: { updatedAt: number; device: string }, b: { updatedAt: number; device: string }) =>

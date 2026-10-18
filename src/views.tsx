@@ -1,8 +1,9 @@
+import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { CategoryChips, RecipeCard, RecipeList, Segmented, categoryLabel, displayName } from './components'
+import { CategoryChips, RecipeCard, RecipeForm, RecipeList, Segmented, categoryLabel, displayName } from './components'
 import { candidates, isNew, pick } from './random'
-import { newRecipeUrl } from './recipes'
-import type { Syncer } from './server'
+import type { NewRecipe, Syncer } from './server'
+import { ApiError, fetchRecipe, isConfigured } from './server'
 import type { Store } from './store'
 import type { Actions } from './storage'
 import { decodeState, encodeState } from './storage'
@@ -109,7 +110,7 @@ export function RandomView({
   )
 }
 
-export function RecipesView({ recipes, state, actions }: ViewProps) {
+export function RecipesView({ recipes, state, actions, store }: ViewProps & { store: Store }) {
   const [query, setQuery] = useState('')
   const [cats, setCats] = useState<Category[]>([])
   const q = query.trim().toLowerCase()
@@ -132,22 +133,76 @@ export function RecipesView({ recipes, state, actions }: ViewProps) {
         <CategoryChips value={cats} onChange={setCats} />
       </div>
       <RecipeList list={list} state={state} actions={actions} empty="Inga recept matchar sökningen." />
-      <AddRecipe />
+      <AddRecipe store={store} actions={actions} />
     </section>
   )
 }
 
-function AddRecipe() {
+/**
+ * Lägg till en egen rätt: från en länk (servern hämtar sidan och fyller i formuläret) eller för hand. Den sparas i
+ * databasen och synkas till den andra telefonen som allt annat.
+ */
+function AddRecipe({ store, actions }: { store: Store; actions: Actions }) {
+  const [draft, setDraft] = useState<NewRecipe>()
+  const [link, setLink] = useState('')
+  const [fetching, setFetching] = useState(false)
+  const [message, setMessage] = useState<string>()
+  const server = store.meta.server
+
+  const fetchLink = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!link.trim()) return
+    setFetching(true)
+    setMessage(undefined)
+    try {
+      setDraft(await fetchRecipe(server, link))
+      setLink('')
+    } catch (err) {
+      setMessage(err instanceof ApiError ? err.message : 'Kunde inte hämta receptet.')
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  if (draft) {
+    return (
+      <div className="panel">
+        <h3>{draft.name ? 'Stämmer det?' : 'Ny rätt'}</h3>
+        {draft.link && <p className="meta">Hämtat från {new URL(draft.link).hostname.replace(/^www\./, '')}. Ändra det du vill och spara.</p>}
+        <RecipeForm
+          recipe={draft}
+          onSave={(r) => {
+            actions.saveRecipe(r)
+            setMessage(`${r.name} är tillagd.`)
+            setDraft(undefined)
+          }}
+          onCancel={() => setDraft(undefined)}
+        />
+      </div>
+    )
+  }
   return (
     <div className="panel add">
       <h3>Saknas en rätt?</h3>
-      <p>
-        Recepten ligger som filer i <code>recipes/</code> i repot. Lägg till en fil så blir det en pull request, och när den är
-        mergad finns rätten i appen.
-      </p>
-      <a className="button" href={newRecipeUrl} target="_blank" rel="noreferrer">
-        Lägg till recept på GitHub ↗
-      </a>
+      {isConfigured(server) ? (
+        <form className="row" onSubmit={fetchLink}>
+          <input
+            type="url"
+            inputMode="url"
+            placeholder="Klistra in en länk, t.ex. från ICA"
+            aria-label="Länk till ett recept"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+          />
+          <button type="submit" className="primary" disabled={!link.trim() || fetching}>
+            {fetching ? 'Hämtar…' : 'Hämta'}
+          </button>
+        </form>
+      ) : (
+        <p className="meta">Med en server kan du klistra in en länk till ett recept, t.ex. från ICA, och få det ifyllt.</p>
+      )}
+      {message && <p className="meta">{message}</p>}
+      <button onClick={() => setDraft({ name: '', category: 'fast' })}>Skriv in själv</button>
     </div>
   )
 }
@@ -189,9 +244,9 @@ export function InspirationView({ recipes, state, actions, store, onRoll }: View
         list={list}
         state={state}
         actions={actions}
-        empty="Ni har testat allt! Lägg till fler recept via GitHub så dyker de upp här."
+        empty="Ni har testat allt! Lägg till fler rätter under Recept så dyker de upp här."
       />
-      <AddRecipe />
+      <AddRecipe store={store} actions={actions} />
     </section>
   )
 }

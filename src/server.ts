@@ -80,7 +80,7 @@ async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Pro
   if (res.status === 401) throw new ApiError('Servern vill ha en annan nyckel.')
   if (!res.ok) {
     const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined
-    throw new ApiError(`Servern svarade ${res.status}${body?.error ? `: ${body.error}` : ''}.`)
+    throw new ApiError(body?.error ? `${body.error}.` : `Servern svarade ${res.status}.`)
   }
   return (await res.json()) as T
 }
@@ -97,6 +97,25 @@ async function whyUnreachable(base: string) {
     return `${host} svarar, men webbläsaren stoppade svaret. Kolla serverns logg efter fel, och att Matpref__AllowedOrigins__0 är ${location.origin}.`
   } catch {
     return `Den här enheten når inte ${host}. Är Tailscale på? I Chrome kan sidan också behöva tillåtelse att nå enheter i lokala nätverket (under låset bredvid adressen).`
+  }
+}
+
+export type NewRecipe = Omit<Recipe, 'id'>
+
+/** Låter servern hämta ett recept från en länk (t.ex. ICA). Webbläsaren får inte läsa andra sajter själv. */
+export async function fetchRecipe(s: ServerSettings, link: string): Promise<NewRecipe> {
+  const r = await call<NewRecipe & { [key: string]: unknown }>(s, `/fetch-recipe?url=${encodeURIComponent(link.trim())}`)
+  return {
+    name: r.name,
+    category: r.category,
+    description: r.description ?? undefined,
+    image: r.image ?? undefined,
+    timeMinutes: r.timeMinutes ?? undefined,
+    servings: r.servings ?? undefined,
+    ingredients: r.ingredients,
+    steps: r.steps,
+    tags: r.tags,
+    link: r.link,
   }
 }
 
