@@ -54,6 +54,29 @@ TrueNAS SCALE 24.10 (Electric Eel) och senare kör appar med Docker och kan inst
 
 Imagen läggs upp på GitHub när PR:en är mergad. Om TrueNAS inte får hämta den (fel om `denied` eller `unauthorized`), gör paketet publikt på GitHub: *Packages → matpref-server → Package settings → Change visibility*.
 
+Behåll `:latest` i `image:`. Med en hash eller commit där får appen aldrig nya versioner, varken av sig själv eller med *Pull images*.
+
+#### Uppdatera av sig själv efter merge
+
+När en ändring i `server/` mergas bygger GitHub Actions imagen, ansluter till ert tailnet och ber TrueNAS hämta den nya imagen och starta om appen (samma sak som *Pull images* i TrueNAS). Tills inställningarna nedan finns hoppas det steget över. Kräver TrueNAS 25.04 eller senare.
+
+1. **En https-adress till TrueNAS webbgränssnitt i tailnetet.** Lägg till en proxy host i Nginx Proxy Manager, t.ex. `truenas.tail.elmarsson.se`, med *Scheme* `https`, NAS:ens adress och TrueNAS https-port för webbgränssnittet (*System → General Settings → GUI*), slå på *Websockets Support* och ge den samma certifikat som matpref. Scheme måste vara `https`: kommer anropet okrypterat till TrueNAS spärrar den API-nyckeln första gången den används.
+   Vill du hellre gå direkt till NAS:en (`https://<nas-namn eller tailscale-ip>`) med TrueNAS eget självsignerade certifikat, sätt variabeln `TRUENAS_SKIP_TLS_VERIFY` till `true` i steg 4. Trafiken är fortfarande krypterad, men certifikatet kontrolleras inte.
+2. **En API-nyckel i TrueNAS.** Kontoikonen uppe till höger → *My API Keys* → *Add*, döp den till t.ex. `github-matpref`. Nyckeln har samma rättigheter som ditt konto, så lägg den bara som secret på GitHub.
+3. **Tailscale.**
+   - Under [Access controls](https://login.tailscale.com/admin/acls) lägger du till taggen som GitHub-maskinerna får: `"tagOwners": { "tag:ci": ["autogroup:admin"] }`. Har ni bara standardregeln som släpper igenom allt behövs inget mer, annars en regel som låter `tag:ci` nå NAS:en på porten i adressen från steg 1 (oftast 443).
+   - Under [Settings → OAuth clients](https://login.tailscale.com/admin/settings/oauth) (heter *Trust credentials* i nyare versioner) skapar du en OAuth-klient med scope *Auth Keys: Write* och taggen `tag:ci`. Spara klient-id och hemligheten.
+4. **GitHub.** I repot under *Settings → Secrets and variables → Actions*:
+   | Namn | Typ | Värde |
+   | --- | --- | --- |
+   | `TS_OAUTH_CLIENT_ID` | Secret | Klient-id från Tailscale |
+   | `TS_OAUTH_SECRET` | Secret | Hemligheten från Tailscale |
+   | `TRUENAS_API_KEY` | Secret | API-nyckeln från TrueNAS |
+   | `TRUENAS_URL` | Variable | Adressen från steg 1, t.ex. `https://truenas.tail.elmarsson.se` |
+   | `TRUENAS_APP` | Variable (valfri) | Appens namn i TrueNAS, om det inte är `matpref` |
+   | `TRUENAS_SKIP_TLS_VERIFY` | Variable (valfri) | `true` för TrueNAS självsignerade certifikat |
+5. **Testa** under *Actions → Server-image → Run workflow* på `main`. Jobbet *deploy* ska sluta med "matpref kör nu den senaste imagen", och under *Vi → Server* i appen syns den nya versionen.
+
 ## Appen behöver en https-adress
 
 Appen ligger på `https://elmaxe.github.io`, och en https-sida får inte anropa en `http://`-adress. Webbläsaren stoppar det (*mixed content*) innan anropet når servern, även om ni är på samma nätverk. Så `http://192.168.1.10:8080` fungerar inte i appen, utan servern behöver nås via https med ett giltigt certifikat. Några sätt, från enklast:
