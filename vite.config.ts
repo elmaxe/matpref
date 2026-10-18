@@ -4,6 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // GitHub Pages serverar sidan under /matpref/. Lokalt körs den på /.
 const base = process.env.BASE_PATH ?? '/'
+// Sätts när en PR-förhandsvisning byggs, se .github/workflows/preview.yml.
+const preview = process.env.VITE_PREVIEW_LABEL
 
 export default defineConfig({
   base,
@@ -13,8 +15,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Matpref – vad ska vi äta?',
-        short_name: 'Matpref',
+        id: base,
+        name: preview ? `Matpref (${preview})` : 'Matpref – vad ska vi äta?',
+        short_name: preview ? `Matpref ${preview}` : 'Matpref',
         description: 'Slumpa fram middag utifrån era recept, favoriter och preferenser.',
         lang: 'sv',
         theme_color: '#e8590c',
@@ -30,6 +33,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // Den riktiga appens service worker täcker hela /matpref/. Låt förhandsvisningarna gå till nätet.
+        navigateFallbackDenylist: [/\/pr-preview\//],
       },
     }),
   ],

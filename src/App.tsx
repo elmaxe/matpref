@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { recipes } from './recipes'
-import { decodeState, useAppState } from './storage'
+import { PREVIEW_LABEL, decodeState, useAppState } from './storage'
 import type { AppState, Filters } from './types'
 import { FavoritesView, InspirationView, PeopleView, RandomView, RecipesView } from './views'
 
@@ -54,6 +54,9 @@ export default function App() {
   return (
     <div className="app">
       <header>
+        {PREVIEW_LABEL && (
+          <p className="preview-banner">Förhandsvisning av {PREVIEW_LABEL}. Ändringar här påverkar inte den riktiga appen.</p>
+        )}
         <h1>{TITLES[tab]}</h1>
       </header>
 

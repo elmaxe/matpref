@@ -46,4 +46,11 @@ npm run build     # validerar recepten, typkontrollerar och bygger till dist/
 
 ## Publicering
 
-`.github/workflows/deploy.yml` bygger och publicerar till GitHub Pages vid varje push till `main`. Slå på det en gång under *Settings → Pages → Build and deployment → Source: GitHub Actions*. Appen hamnar då på `https://<användare>.github.io/matpref/`.
+Appen ligger på GitHub Pages och publiceras från grenen `gh-pages`, som skapas av workflowen första gången den körs.
+
+- **Riktiga appen**: `.github/workflows/deploy.yml` bygger och lägger ut `main` på `https://<användare>.github.io/matpref/` vid varje push till `main`.
+- **Förhandsvisningar**: `.github/workflows/preview.yml` bygger varje PR och lägger den på `https://<användare>.github.io/matpref/pr-preview/pr-<nummer>/`. En kommentar med länken (och en QR-kod för mobilen) dyker upp på PR:en och uppdateras vid varje push. När PR:en stängs eller mergas tas förhandsvisningen bort.
+
+En förhandsvisning visar en banner överst och sparar sina listor separat från den riktiga appen. Den startar med en kopia av era riktiga listor, så ni kan testa med riktig data utan att röra den.
+
+Engångsinställning: *Settings → Pages → Build and deployment → Source: Deploy from a branch*, välj `gh-pages` och `/ (root)`.

@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import type { AppState, PersonId, Rating } from './types'
 import { PERSON_IDS } from './types'
 
-const KEY = 'matpref:v1'
+export const PREVIEW_LABEL: string | undefined = import.meta.env.VITE_PREVIEW_LABEL
+
+const MAIN_KEY = 'matpref:v1'
+// En förhandsvisning delar localStorage med den riktiga appen (samma domän), så den sparar under en egen nyckel
+// men startar med en kopia av era riktiga listor.
+const KEY = PREVIEW_LABEL ? `${MAIN_KEY}:${import.meta.env.BASE_URL}` : MAIN_KEY
 
 export const emptyState = (): AppState => ({
   version: 1,
@@ -35,7 +40,7 @@ export function sanitize(raw: unknown): AppState {
 
 function load(): AppState {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = localStorage.getItem(KEY) ?? (KEY !== MAIN_KEY ? localStorage.getItem(MAIN_KEY) : null)
     return raw ? sanitize(JSON.parse(raw)) : emptyState()
   } catch {
     return emptyState()
