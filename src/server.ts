@@ -74,16 +74,26 @@ async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Pro
       },
     })
   } catch {
-    throw new ApiError(
-      mixedContentProblem(base) ??
-        (navigator.onLine
-          ? 'Kunde inte nå servern. Går adressen att öppna i webbläsaren är det troligen CORS: Matpref__AllowedOrigins__0 på servern ska vara https://elmaxe.github.io.'
-          : 'Du är offline.'),
-    )
+    throw new ApiError(mixedContentProblem(base) ?? (navigator.onLine ? await whyUnreachable(base) : 'Du är offline.'))
   }
   if (res.status === 401) throw new ApiError('Servern vill ha en annan nyckel.')
   if (!res.ok) throw new ApiError(`Servern svarade ${res.status}.`)
   return (await res.json()) as T
+}
+
+/**
+ * Webbläsaren säger bara "failed to fetch", oavsett orsak. Ett anrop utan CORS skiljer på om servern inte går att nå
+ * alls från den här enheten, eller om den svarar men webbläsaren stoppar svaret.
+ */
+async function whyUnreachable(base: string) {
+  let host = base
+  try {
+    host = new URL(base).host
+    await fetch(`${base}/healthz`, { mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(5000) })
+    return `${host} svarar, men webbläsaren stoppade svaret (CORS). Matpref__AllowedOrigins__0 på servern ska vara ${location.origin}.`
+  } catch {
+    return `Den här enheten når inte ${host}. Är Tailscale på? I Chrome kan sidan också behöva tillåtelse att nå enheter i lokala nätverket (under låset bredvid adressen).`
+  }
 }
 
 export const health = (s: ServerSettings) => call<Health>(s, '/health')
