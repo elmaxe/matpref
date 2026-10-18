@@ -64,14 +64,15 @@ export class ApiError extends Error {}
 
 async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Promise<T> {
   const base = normalizeUrl(s.url)
+  // Ett "enkelt" anrop enligt CORS: inga egna headers och JSON skickad som text/plain. Då skickar webbläsaren anropet
+  // direkt i stället för att först fråga servern (en preflight), som vissa webbläsare och proxyer inte släpper igenom.
   let res: Response
   try {
-    res = await fetch(`${base}/api${path}`, {
+    const url = new URL(`${base}/api${path}`)
+    if (s.token) url.searchParams.set('token', s.token)
+    res = await fetch(url, {
       ...init,
-      headers: {
-        ...(s.token ? { 'X-Matpref-Token': s.token } : {}),
-        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      },
+      headers: init?.body ? { 'Content-Type': 'text/plain;charset=UTF-8' } : {},
     })
   } catch {
     throw new ApiError(mixedContentProblem(base) ?? (navigator.onLine ? await whyUnreachable(base) : 'Du är offline.'))

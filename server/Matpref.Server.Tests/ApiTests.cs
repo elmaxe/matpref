@@ -199,4 +199,21 @@ public sealed class ApiTests : IDisposable
         Assert.Equal("https://elmaxe.github.io", res.Headers.GetValues("Access-Control-Allow-Origin").Single());
         Assert.Contains("kv", (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
     }
+
+    [Fact]
+    public async Task App_can_sync_without_a_preflight()
+    {
+        // Som appen gör: nyckeln i adressen och JSON som text/plain, så att webbläsaren inte behöver fråga först.
+        using var factory = Factory(token: "hemlig");
+        var client = factory.CreateClient();
+        var body = new StringContent("""{"cursor":0,"changes":[{"key":"name/a","value":"Axel","updatedAt":1,"device":"d"}]}""",
+            System.Text.Encoding.UTF8, "text/plain");
+        var res = await client.PostAsync("/api/sync?token=hemlig", body);
+        res.EnsureSuccessStatusCode();
+        var json = await res.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("\"Axel\"", Values(json)["name/a"]);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync("/api/sync?token=fel", new StringContent("{}"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/sync?token=hemlig", new StringContent("inte json"))).StatusCode);
+    }
 }

@@ -93,7 +93,7 @@ Fler källor läggs till under `Import:Sources` i `appsettings.json`: ett namn, 
 
 ## API
 
-Har servern en nyckel måste alla anrop under `/api` skicka den: `curl -H "X-Matpref-Token: <nyckel>" https://<din-adress>/api/version`.
+Har servern en nyckel måste alla anrop under `/api` skicka den, som headern `X-Matpref-Token` eller som `?token=` i adressen: `curl -H "X-Matpref-Token: <nyckel>" https://<din-adress>/api/version`. Appen använder `?token=` och skickar JSON som `text/plain`, så att webbläsaren skickar anropen direkt utan att fråga servern först (CORS-preflight).
 
 | Anrop | Vad |
 | --- | --- |
