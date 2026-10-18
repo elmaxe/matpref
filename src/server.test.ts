@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mixedContentProblem, toRecipe } from './server'
+import { mixedContentProblem, normalizeUrl, toRecipe } from './server'
 
 describe('mixedContentProblem', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -21,4 +21,13 @@ it('gör om en matchning till ett recept', () => {
   const r = toRecipe({ id: 'web-7', source: 'ICA', url: 'https://www.ica.se/recept/x-1/', title: 'Tacos', category: 'fast', totalMinutes: 20, image: null, rank: 0.5 })
   expect(r).toMatchObject({ id: 'web-7', name: 'Tacos', link: 'https://www.ica.se/recept/x-1/', timeMinutes: 20, source: 'ICA' })
   expect(r.image).toBeUndefined()
+})
+
+it('gör om det som skrevs i adressfältet till serverns adress', () => {
+  expect(normalizeUrl('matpref.tail.exempel.se')).toBe('https://matpref.tail.exempel.se')
+  expect(normalizeUrl(' https://matpref.tail.exempel.se/ ')).toBe('https://matpref.tail.exempel.se')
+  expect(normalizeUrl('https://matpref.tail.exempel.se/api/health')).toBe('https://matpref.tail.exempel.se')
+  expect(normalizeUrl('http://192.168.1.10:8080/api')).toBe('http://192.168.1.10:8080')
+  expect(normalizeUrl('https://nas.exempel.se/matpref/')).toBe('https://nas.exempel.se/matpref')
+  expect(normalizeUrl('  ')).toBe('')
 })

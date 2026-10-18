@@ -169,4 +169,34 @@ public sealed class ApiTests : IDisposable
         Assert.Equal("3baefba", res.GetProperty("version").GetString());
         Assert.Equal("2026-10-18T19:14:13Z", res.GetProperty("built").GetString());
     }
+
+    [Fact]
+    public async Task Allowed_origin_may_include_the_apps_path()
+    {
+        using var factory = Factory().WithWebHostBuilder(b => b.UseSetting("Matpref:AllowedOrigins:0", "https://elmaxe.github.io/matpref/"));
+        var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/sync");
+        preflight.Headers.Add("Origin", "https://elmaxe.github.io");
+        preflight.Headers.Add("Access-Control-Request-Method", "POST");
+        preflight.Headers.Add("Access-Control-Request-Headers", "content-type,x-matpref-token");
+        var res = await factory.CreateClient().SendAsync(preflight);
+        Assert.Equal("https://elmaxe.github.io", res.Headers.GetValues("Access-Control-Allow-Origin").Single());
+    }
+
+    [Fact]
+    public async Task Server_errors_keep_the_cors_headers_so_the_app_can_show_them()
+    {
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(_dir, "test.db")}"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DROP TABLE kv";
+            cmd.ExecuteNonQuery();
+        }
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/sync") { Content = JsonContent.Create(new { cursor = 0, changes = Array.Empty<object>() }) };
+        req.Headers.Add("Origin", "https://elmaxe.github.io");
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.InternalServerError, res.StatusCode);
+        Assert.Equal("https://elmaxe.github.io", res.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        Assert.Contains("kv", (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
+    }
 }

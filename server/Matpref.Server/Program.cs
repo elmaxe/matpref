@@ -19,7 +19,10 @@ builder.Services.AddSingleton(sp =>
     ActivatorUtilities.CreateInstance<Importer>(sp, sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(Importer))));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Importer>());
 
-var origins = builder.Configuration.GetSection("Matpref:AllowedOrigins").Get<string[]>() ?? [];
+// Webbläsaren skickar bara schema och värd ("https://elmaxe.github.io"), så sökväg och snedstreck i inställningen tas bort.
+var origins = (builder.Configuration.GetSection("Matpref:AllowedOrigins").Get<string[]>() ?? [])
+    .Select(o => Uri.TryCreate(o.Trim(), UriKind.Absolute, out var u) ? u.GetLeftPart(UriPartial.Authority) : o.Trim())
+    .ToArray();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod()));
 
 var app = builder.Build();
@@ -32,6 +35,22 @@ app.Use(async (ctx, next) =>
     await next();
 });
 app.UseCors();
+
+// Ett fel i servern ska synas som ett fel i appen. Utan det här försvinner CORS-headrarna med felet, och webbläsaren
+// rapporterar det som ett CORS-problem i stället.
+app.Use(async (ctx, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception e) when (!ctx.Response.HasStarted && !ctx.RequestAborted.IsCancellationRequested)
+    {
+        ctx.RequestServices.GetRequiredService<ILogger<Program>>().LogError(e, "Fel vid {Method} {Path}", ctx.Request.Method, ctx.Request.Path);
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await ctx.Response.WriteAsJsonAsync(new { error = e.Message });
+    }
+});
 
 // Valfri delad nyckel. Servern ska ligga bakom VPN, men en nyckel skadar inte.
 app.Use(async (ctx, next) =>

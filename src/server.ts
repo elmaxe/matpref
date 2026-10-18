@@ -35,6 +35,19 @@ export interface Health {
 
 export const isConfigured = (s: ServerSettings) => s.url.trim() !== ''
 
+/**
+ * Gör om det som skrevs i adressfältet till serverns basadress: "matpref.example.se/api/health" blir
+ * "https://matpref.example.se". Utan https:// skulle webbläsaren tolka adressen som en sökväg på GitHub Pages.
+ */
+export function normalizeUrl(url: string) {
+  const u = url
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/api(\/.*)?$/i, '')
+  if (!u) return ''
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(u) ? u : `https://${u}`
+}
+
 /** En https-sida (som GitHub Pages) får inte anropa en http-adress. Webbläsaren stoppar det innan det når servern. */
 export function mixedContentProblem(url: string): string | undefined {
   if (location.protocol !== 'https:' || !/^http:\/\//i.test(url.trim())) return undefined
@@ -50,7 +63,7 @@ export function mixedContentProblem(url: string): string | undefined {
 export class ApiError extends Error {}
 
 async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Promise<T> {
-  const base = s.url.trim().replace(/\/+$/, '')
+  const base = normalizeUrl(s.url)
   let res: Response
   try {
     res = await fetch(`${base}/api${path}`, {
@@ -61,11 +74,29 @@ async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Pro
       },
     })
   } catch {
-    throw new ApiError(mixedContentProblem(base) ?? (navigator.onLine ? 'Kunde inte nå servern.' : 'Du är offline.'))
+    throw new ApiError(mixedContentProblem(base) ?? (navigator.onLine ? await whyUnreachable(base) : 'Du är offline.'))
   }
   if (res.status === 401) throw new ApiError('Servern vill ha en annan nyckel.')
-  if (!res.ok) throw new ApiError(`Servern svarade ${res.status}.`)
+  if (!res.ok) {
+    const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined
+    throw new ApiError(`Servern svarade ${res.status}${body?.error ? `: ${body.error}` : ''}.`)
+  }
   return (await res.json()) as T
+}
+
+/**
+ * Webbläsaren säger bara "failed to fetch", oavsett orsak. Ett anrop utan CORS skiljer på om servern inte går att nå
+ * alls från den här enheten, eller om den svarar men webbläsaren stoppar svaret.
+ */
+async function whyUnreachable(base: string) {
+  let host = base
+  try {
+    host = new URL(base).host
+    await fetch(`${base}/healthz`, { mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(5000) })
+    return `${host} svarar, men webbläsaren stoppade svaret. Kolla serverns logg efter fel, och att Matpref__AllowedOrigins__0 är ${location.origin}.`
+  } catch {
+    return `Den här enheten når inte ${host}. Är Tailscale på? I Chrome kan sidan också behöva tillåtelse att nå enheter i lokala nätverket (under låset bredvid adressen).`
+  }
 }
 
 export const health = (s: ServerSettings) => call<Health>(s, '/health')
