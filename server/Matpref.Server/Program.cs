@@ -36,6 +36,22 @@ app.Use(async (ctx, next) =>
 });
 app.UseCors();
 
+// Ett fel i servern ska synas som ett fel i appen. Utan det här försvinner CORS-headrarna med felet, och webbläsaren
+// rapporterar det som ett CORS-problem i stället.
+app.Use(async (ctx, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception e) when (!ctx.Response.HasStarted && !ctx.RequestAborted.IsCancellationRequested)
+    {
+        ctx.RequestServices.GetRequiredService<ILogger<Program>>().LogError(e, "Fel vid {Method} {Path}", ctx.Request.Method, ctx.Request.Path);
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await ctx.Response.WriteAsJsonAsync(new { error = e.Message });
+    }
+});
+
 // Valfri delad nyckel. Servern ska ligga bakom VPN, men en nyckel skadar inte.
 app.Use(async (ctx, next) =>
 {

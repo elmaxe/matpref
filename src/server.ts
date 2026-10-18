@@ -77,7 +77,10 @@ async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Pro
     throw new ApiError(mixedContentProblem(base) ?? (navigator.onLine ? await whyUnreachable(base) : 'Du är offline.'))
   }
   if (res.status === 401) throw new ApiError('Servern vill ha en annan nyckel.')
-  if (!res.ok) throw new ApiError(`Servern svarade ${res.status}.`)
+  if (!res.ok) {
+    const body = (await res.json().catch(() => undefined)) as { error?: string } | undefined
+    throw new ApiError(`Servern svarade ${res.status}${body?.error ? `: ${body.error}` : ''}.`)
+  }
   return (await res.json()) as T
 }
 
@@ -90,7 +93,7 @@ async function whyUnreachable(base: string) {
   try {
     host = new URL(base).host
     await fetch(`${base}/healthz`, { mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(5000) })
-    return `${host} svarar, men webbläsaren stoppade svaret (CORS). Matpref__AllowedOrigins__0 på servern ska vara ${location.origin}.`
+    return `${host} svarar, men webbläsaren stoppade svaret. Kolla serverns logg efter fel, och att Matpref__AllowedOrigins__0 är ${location.origin}.`
   } catch {
     return `Den här enheten når inte ${host}. Är Tailscale på? I Chrome kan sidan också behöva tillåtelse att nå enheter i lokala nätverket (under låset bredvid adressen).`
   }

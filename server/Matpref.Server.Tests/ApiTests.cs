@@ -181,4 +181,22 @@ public sealed class ApiTests : IDisposable
         var res = await factory.CreateClient().SendAsync(preflight);
         Assert.Equal("https://elmaxe.github.io", res.Headers.GetValues("Access-Control-Allow-Origin").Single());
     }
+
+    [Fact]
+    public async Task Server_errors_keep_the_cors_headers_so_the_app_can_show_them()
+    {
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(_dir, "test.db")}"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DROP TABLE kv";
+            cmd.ExecuteNonQuery();
+        }
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/sync") { Content = JsonContent.Create(new { cursor = 0, changes = Array.Empty<object>() }) };
+        req.Headers.Add("Origin", "https://elmaxe.github.io");
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.InternalServerError, res.StatusCode);
+        Assert.Equal("https://elmaxe.github.io", res.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        Assert.Contains("kv", (await res.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
+    }
 }
