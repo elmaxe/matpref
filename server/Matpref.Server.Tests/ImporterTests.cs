@@ -60,7 +60,7 @@ public sealed class ImporterTests : IDisposable
         var importer = new Importer(db, new HttpClient(site), new Monitor(options), NullLogger<Importer>.Instance);
 
         Assert.Equal(1, await importer.RunAsync(force: false, CancellationToken.None));
-        var card = Assert.Single(db.Deck("a", 10, null).Cards);
+        var card = Assert.Single(db.Recipes(0, 10).Recipes);
         Assert.Equal("Tacos", card.Title);
         Assert.Equal("fast", card.Category);
         Assert.DoesNotContain("https://x.se/sitemaps/products/1", site.Requested);

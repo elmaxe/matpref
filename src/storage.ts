@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
+import { openDb, idbBackend, readAll } from './idb'
+import { Store } from './store'
 import type { AppState, PersonId, Rating } from './types'
 import { PERSON_IDS } from './types'
 
 export const PREVIEW_LABEL: string | undefined = import.meta.env.VITE_PREVIEW_LABEL
 
+// Där listorna låg innan appen fick sin lokala databas. Läses bara en gång, för att flytta över dem.
 const MAIN_KEY = 'matpref:v1'
-// En förhandsvisning delar localStorage med den riktiga appen (samma domän), så den sparar under en egen nyckel
-// men startar med en kopia av era riktiga listor.
-const KEY = PREVIEW_LABEL ? `${MAIN_KEY}:${import.meta.env.BASE_URL}` : MAIN_KEY
 
 export const emptyState = (): AppState => ({
   version: 1,
@@ -36,15 +36,6 @@ export function sanitize(raw: unknown): AppState {
     for (const [id, d] of Object.entries(raw.cooked)) if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) s.cooked[id] = d
   }
   return s
-}
-
-function load(): AppState {
-  try {
-    const raw = localStorage.getItem(KEY) ?? (KEY !== MAIN_KEY ? localStorage.getItem(MAIN_KEY) : null)
-    return raw ? sanitize(JSON.parse(raw)) : emptyState()
-  } catch {
-    return emptyState()
-  }
 }
 
 /** Slår ihop importerad data med den lokala. Vid krock vinner det importerade, utom att senaste lagningsdatum behålls. */
@@ -76,45 +67,75 @@ export function decodeState(code: string): AppState {
 
 export const today = () => new Date().toLocaleDateString('sv-SE')
 
-export function useAppState() {
-  const [state, setState] = useState<AppState>(load)
+const DB_NAME = PREVIEW_LABEL ? `matpref:${import.meta.env.BASE_URL}` : 'matpref'
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state))
-    } catch {
-      // Privat läge eller full lagring: appen fungerar ändå, men sparar inte.
-    }
-  }, [state])
-
-  const rate = useCallback((person: PersonId, id: string, rating: Rating) => {
-    setState((s) => {
-      const mine = { ...s.ratings[person] }
-      if (mine[id] === rating) delete mine[id]
-      else mine[id] = rating
-      return { ...s, ratings: { ...s.ratings, [person]: mine } }
-    })
-  }, [])
-
-  const toggleFavorite = useCallback((id: string) => {
-    setState((s) => ({
-      ...s,
-      favorites: s.favorites.includes(id) ? s.favorites.filter((f) => f !== id) : [...s.favorites, id],
-    }))
-  }, [])
-
-  const markCooked = useCallback((id: string) => {
-    setState((s) => ({ ...s, cooked: { ...s.cooked, [id]: today() } }))
-  }, [])
-
-  const rename = useCallback((person: PersonId, name: string) => {
-    setState((s) => ({ ...s, names: { ...s.names, [person]: name.slice(0, 40) } }))
-  }, [])
-
-  const importState = useCallback((incoming: AppState) => setState((s) => merge(s, incoming)), [])
-  const reset = useCallback(() => setState(emptyState()), [])
-
-  return { state, rate, toggleFavorite, markCooked, rename, importState, reset }
+function readLocal(key: string): unknown {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : undefined
+  } catch {
+    return undefined
+  }
 }
 
-export type Actions = Omit<ReturnType<typeof useAppState>, 'state'>
+/**
+ * Öppnar den lokala databasen. Första gången flyttas det som tidigare låg i localStorage hit. En förhandsvisning startar
+ * med en kopia av den riktiga appens data, men utan serverinställningar, så att den inte synkar om du inte ber den.
+ */
+export async function openStore(): Promise<Store> {
+  let store: Store
+  try {
+    store = new Store(idbBackend(await openDb(DB_NAME)))
+    await store.load()
+  } catch {
+    // Ingen IndexedDB (t.ex. vissa privata lägen): appen fungerar, men glömmer allt när den stängs.
+    store = new Store()
+  }
+  if (store.meta.migrated) return store
+
+  let copied = false
+  if (PREVIEW_LABEL) {
+    try {
+      const main = await readAll(await openDb('matpref'))
+      if (main.meta?.migrated) {
+        store.applyRemote(main.entries)
+        store.markAllDirty()
+        store.addRecipes(main.recipes)
+        store.setMeta({ me: main.meta.me })
+        copied = true
+      }
+    } catch {
+      // Ingen riktig app att kopiera från.
+    }
+  }
+  if (!copied) {
+    const old = readLocal(PREVIEW_LABEL ? `${MAIN_KEY}:${import.meta.env.BASE_URL}` : MAIN_KEY) ?? readLocal(MAIN_KEY)
+    if (old) store.importState(sanitize(old))
+    const server = readLocal('matpref:server') as { url?: string; token?: string; me?: PersonId } | undefined
+    if (!PREVIEW_LABEL && server?.url) store.setMeta({ server: { url: server.url, token: server.token ?? '' } })
+    if (server?.me === 'a' || server?.me === 'b') store.setMeta({ me: server.me })
+  }
+  store.setMeta({ migrated: true })
+  await store.flush()
+  return store
+}
+
+/** Appens tillstånd och åtgärder, ovanpå den lokala databasen. */
+export function useAppState(store: Store) {
+  useSyncExternalStore(store.subscribe, store.getVersion)
+  const state = store.state()
+  const actions = useMemo(
+    () => ({
+      rate: (person: PersonId, id: string, rating: Rating) => store.rate(person, id, rating),
+      toggleFavorite: (id: string) => store.toggleFavorite(id),
+      markCooked: (id: string) => store.markCooked(id, today()),
+      rename: (person: PersonId, name: string) => store.rename(person, name),
+      importState: (incoming: AppState) => store.importState(incoming),
+      reset: () => void store.reset(),
+    }),
+    [store],
+  )
+  return { state, actions }
+}
+
+export type Actions = ReturnType<typeof useAppState>['actions']

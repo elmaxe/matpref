@@ -18,7 +18,7 @@ describe('mixedContentProblem', () => {
 })
 
 it('gör om en matchning till ett recept', () => {
-  const r = toRecipe({ id: 7, source: 'ICA', url: 'https://www.ica.se/recept/x-1/', title: 'Tacos', category: 'fast', totalMinutes: 20, image: null })
+  const r = toRecipe({ id: 'web-7', source: 'ICA', url: 'https://www.ica.se/recept/x-1/', title: 'Tacos', category: 'fast', totalMinutes: 20, image: null, rank: 0.5 })
   expect(r).toMatchObject({ id: 'web-7', name: 'Tacos', link: 'https://www.ica.se/recept/x-1/', timeMinutes: 20, source: 'ICA' })
   expect(r.image).toBeUndefined()
 })

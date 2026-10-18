@@ -47,10 +47,6 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
-static bool ValidUser(string? user) => user is not null && Db.Users.Contains(user);
-static IResult BadUser() => Results.BadRequest(new { error = "user måste vara a eller b" });
-string[] categories = ["fast", "storkok", "finmiddag"];
-
 var api = app.MapGroup("/api");
 
 api.MapGet("/health", (Db db, Importer importer) => new
@@ -60,31 +56,26 @@ api.MapGet("/health", (Db db, Importer importer) => new
     importing = importer.IsRunning,
 });
 
-api.MapGet("/deck", (Db db, string user, int? limit, string? category) =>
+// Appen är local first: den sparar allt lokalt och synkar hit när den kan. Se Db.Sync.
+api.MapPost("/sync", (Db db, SyncRequest req) =>
 {
-    if (!ValidUser(user)) return BadUser();
-    if (category is not null && !categories.Contains(category)) return Results.BadRequest(new { error = "Okänd kategori" });
-    return Results.Ok(db.Deck(user, Math.Clamp(limit ?? 20, 1, 100), category));
+    var changes = req.Changes ?? [];
+    if (changes.Length > 5000) return Results.BadRequest(new { error = "För många ändringar på en gång" });
+    var bad = changes.FirstOrDefault(ch => !Db.ValidKey(ch.Key) || ch.Device is not { Length: > 0 and <= 64 }
+        || ch.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined || ch.Value.GetRawText().Length > 2000);
+    if (bad is not null) return Results.BadRequest(new { error = $"Ogiltig ändring: {bad.Key}" });
+    // En annan databas än telefonen synkade med sist: börja om från början.
+    var cursor = req.DatabaseId == db.DatabaseId ? req.Cursor : 0;
+    var (next, outgoing, more) = db.Sync(cursor, changes);
+    return Results.Ok(new SyncResponse(db.DatabaseId, next, outgoing, more));
 });
 
-api.MapPost("/swipes", (Db db, SwipeRequest req) =>
+// Recepten från nätet. Appen hämtar alla nya så att den kan swipea offline.
+api.MapGet("/recipes", (Db db, long? after, int? limit) =>
 {
-    if (!ValidUser(req.User)) return BadUser();
-    var (found, match) = db.Swipe(req.User, req.RecipeId, req.Liked);
-    return found ? Results.Ok(new { match }) : Results.NotFound(new { error = "Receptet finns inte" });
+    var (recipes, more) = db.Recipes(after ?? 0, Math.Clamp(limit ?? 500, 1, 1000));
+    return new { recipes, more };
 });
-
-api.MapDelete("/swipes/{user}/{recipeId:long}", (Db db, string user, long recipeId) =>
-{
-    if (!ValidUser(user)) return BadUser();
-    db.Undo(user, recipeId);
-    return Results.NoContent();
-});
-
-api.MapGet("/matches", (Db db) => db.Matches());
-
-api.MapDelete("/matches/{recipeId:long}", (Db db, long recipeId) =>
-    db.RemoveMatch(recipeId) ? Results.NoContent() : Results.NotFound());
 
 // Starta en import direkt i stället för att vänta på nästa schemalagda.
 api.MapPost("/import", (Importer importer, IHostApplicationLifetime life) =>
@@ -96,6 +87,8 @@ api.MapPost("/import", (Importer importer, IHostApplicationLifetime life) =>
 
 app.Run();
 
-record SwipeRequest(string User, long RecipeId, bool Liked);
+record SyncRequest(string? DatabaseId, long Cursor, Change[]? Changes);
+
+record SyncResponse(string DatabaseId, long Cursor, Change[] Changes, bool More);
 
 public partial class Program;

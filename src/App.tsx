@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { recipes as ownRecipes } from './recipes'
-import { toRecipe, useServer } from './server'
+import type { Syncer } from './server'
+import { toRecipe } from './server'
 import { PREVIEW_LABEL, decodeState, useAppState } from './storage'
+import type { Store } from './store'
+import { allWebRecipes } from './swipe'
 import type { AppState, Filters } from './types'
 import { FavoritesView, InspirationView, PeopleView, RandomView, RecipesView } from './views'
 
@@ -33,16 +36,16 @@ function readImport(): AppState | undefined {
   }
 }
 
-export default function App() {
-  const { state, ...actions } = useAppState()
+export default function App({ store, syncer }: { store: Store; syncer: Syncer }) {
+  const { state, actions } = useAppState(store)
   const [tab, setTab] = useState<Tab>('random')
   const [filters, setFilters] = useState<Filters>({ categories: [], who: 'both', source: 'all' })
   const [pendingImport, setPendingImport] = useState(readImport)
-  const server = useServer()
   // Rätter ni har matchat på från nätet blir vanliga recept: de kan slumpas, gillas och bli favoriter.
   const recipes = useMemo(
-    () => [...ownRecipes, ...server.matches.map((m) => toRecipe(m.recipe))].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
-    [server.matches],
+    () => [...ownRecipes, ...store.matches(allWebRecipes(store)).map(toRecipe)].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
+    // Räkna om när databasen ändras.
+    [store, state],
   )
 
   useEffect(() => {
@@ -92,8 +95,8 @@ export default function App() {
         {tab === 'random' && <RandomView {...props} filters={filters} setFilters={setFilters} />}
         {tab === 'recipes' && <RecipesView {...props} />}
         {tab === 'favorites' && <FavoritesView {...props} onRoll={() => rollFrom('favorites')} />}
-        {tab === 'new' && <InspirationView {...props} server={server} onRoll={() => rollFrom('new')} />}
-        {tab === 'people' && <PeopleView {...props} server={server} />}
+        {tab === 'new' && <InspirationView {...props} store={store} onRoll={() => rollFrom('new')} />}
+        {tab === 'people' && <PeopleView {...props} store={store} syncer={syncer} />}
       </main>
 
       <nav className="tabs">

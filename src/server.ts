@@ -1,16 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { Category, PersonId, Recipe } from './types'
+import { useSyncExternalStore } from 'react'
+import type { Entry, ServerSettings, Store, WebRecipe } from './store'
+import { webKey } from './store'
+import type { Category, Recipe } from './types'
 
-// Servern (se server/ i repot) håller leken med recept från nätet och era swipes. Allt annat i appen fungerar utan den.
+// Synk mot er egen server (se server/ i repot). Appen fungerar helt utan den; servern gör att två telefoner delar data
+// och att det finns recept från nätet att swipea.
 
-export interface ServerSettings {
-  url: string
-  token: string
-  me: PersonId
-}
-
-/** Ett recept från servern. Bara metadata och en länk till originalet. */
-export interface Card {
+/** Ett recept som servern skickar. */
+interface Card {
   id: number
   source: string
   url: string
@@ -20,37 +17,20 @@ export interface Card {
   totalMinutes?: number | null
   servings?: number | null
   category: Category
+  rank: number
 }
 
-export interface MatchItem {
-  recipe: Card
-  matchedAt: string
+interface SyncResponse {
+  databaseId: string
+  cursor: number
+  changes: Omit<Entry, 'dirty'>[]
+  more: boolean
 }
 
 export interface Health {
   ok: boolean
   recipes: Record<string, number>
   importing: boolean
-}
-
-const SETTINGS_KEY = 'matpref:server'
-const MATCHES_KEY = 'matpref:matches'
-
-function read<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function write(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    // Privat läge eller full lagring.
-  }
 }
 
 export const isConfigured = (s: ServerSettings) => s.url.trim() !== ''
@@ -85,86 +65,137 @@ async function call<T>(s: ServerSettings, path: string, init?: RequestInit): Pro
   }
   if (res.status === 401) throw new ApiError('Servern vill ha en annan nyckel.')
   if (!res.ok) throw new ApiError(`Servern svarade ${res.status}.`)
-  return (res.status === 204 ? undefined : await res.json()) as T
+  return (await res.json()) as T
 }
 
-export const api = {
-  health: (s: ServerSettings) => call<Health>(s, '/health'),
-  deck: (s: ServerSettings, category?: Category, limit = 20) =>
-    call<{ cards: Card[]; remaining: number }>(
-      s,
-      `/deck?user=${s.me}&limit=${limit}${category ? `&category=${category}` : ''}`,
-    ),
-  swipe: (s: ServerSettings, recipeId: number, liked: boolean) =>
-    call<{ match: Card | null }>(s, '/swipes', { method: 'POST', body: JSON.stringify({ user: s.me, recipeId, liked }) }),
-  undo: (s: ServerSettings, recipeId: number) => call<void>(s, `/swipes/${s.me}/${recipeId}`, { method: 'DELETE' }),
-  matches: (s: ServerSettings) => call<MatchItem[]>(s, '/matches'),
-  removeMatch: (s: ServerSettings, recipeId: number) => call<void>(s, `/matches/${recipeId}`, { method: 'DELETE' }),
-}
+export const health = (s: ServerSettings) => call<Health>(s, '/health')
 
-export const WEB_PREFIX = 'web-'
+const toWebRecipe = (c: Card): WebRecipe => ({ ...c, id: webKey(c.id) })
 
-/** Gör om en matchning till ett vanligt recept, så att den kan slumpas, gillas och bli favorit som de andra. */
-export const toRecipe = (c: Card): Recipe => ({
-  id: `${WEB_PREFIX}${c.id}`,
-  name: c.title,
-  category: c.category,
-  description: c.description ?? undefined,
-  timeMinutes: c.totalMinutes ?? undefined,
-  servings: c.servings ?? undefined,
-  link: c.url,
-  image: c.image ?? undefined,
-  source: c.source,
+/** Gör om ett recept från nätet till ett vanligt recept, så att det kan slumpas, gillas och bli favorit som de andra. */
+export const toRecipe = (r: WebRecipe): Recipe => ({
+  id: r.id,
+  name: r.title,
+  category: r.category,
+  description: r.description ?? undefined,
+  timeMinutes: r.totalMinutes ?? undefined,
+  servings: r.servings ?? undefined,
+  link: r.url,
+  image: r.image ?? undefined,
+  source: r.source,
 })
 
-export function useServer() {
-  const [settings, setSettingsState] = useState<ServerSettings>(() => read(SETTINGS_KEY, { url: '', token: '', me: 'a' }))
-  // Matchningarna sparas lokalt också, så att de finns kvar offline och i slumpen.
-  const [matches, setMatches] = useState<MatchItem[]>(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(MATCHES_KEY) ?? '[]')
-      return Array.isArray(raw) ? raw : []
-    } catch {
-      return []
-    }
-  })
-
-  const setSettings = useCallback((s: ServerSettings) => {
-    setSettingsState(s)
-    write(SETTINGS_KEY, s)
-  }, [])
-
-  const storeMatches = useCallback((m: MatchItem[]) => {
-    setMatches(m)
-    write(MATCHES_KEY, m)
-  }, [])
-
-  const refreshMatches = useCallback(async () => {
-    if (!isConfigured(settings)) return
-    try {
-      storeMatches(await api.matches(settings))
-    } catch {
-      // Behåll de sparade matchningarna.
-    }
-  }, [settings, storeMatches])
-
-  const removeMatch = useCallback(
-    async (recipeId: number) => {
-      await api.removeMatch(settings, recipeId)
-      storeMatches(matches.filter((m) => m.recipe.id !== recipeId))
-    },
-    [settings, matches, storeMatches],
-  )
-
-  // Hämta när appen öppnas och när den kommer tillbaka i förgrunden, så att den andras matchningar dyker upp.
-  useEffect(() => {
-    void refreshMatches()
-    const onVisible = () => document.visibilityState === 'visible' && void refreshMatches()
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [refreshMatches])
-
-  return { settings, setSettings, matches, refreshMatches, removeMatch }
+export interface SyncStatus {
+  state: 'off' | 'syncing' | 'ok' | 'error'
+  message?: string
 }
 
-export type Server = ReturnType<typeof useServer>
+/** Synkar den lokala databasen med servern: när något ändras, när appen kommer tillbaka i förgrunden och en gång i minuten. */
+export class Syncer {
+  status: SyncStatus = { state: 'off' }
+  private listeners = new Set<() => void>()
+  private running?: Promise<void>
+  private again = false
+  private timer?: ReturnType<typeof setTimeout>
+  private lastServer = ''
+
+  constructor(private store: Store) {}
+
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn)
+    return () => this.listeners.delete(fn)
+  }
+
+  getStatus = () => this.status
+
+  private setStatus(status: SyncStatus) {
+    this.status = status
+    for (const fn of this.listeners) fn()
+  }
+
+  start() {
+    const soon = () => {
+      clearTimeout(this.timer)
+      this.timer = setTimeout(() => void this.sync(), 1000)
+    }
+    const unsubscribe = this.store.subscribe(() => {
+      const server = JSON.stringify(this.store.meta.server)
+      if (server !== this.lastServer) {
+        this.lastServer = server
+        void this.sync()
+      } else if (this.store.dirtyEntries().length > 0) soon()
+    })
+    const onVisible = () => document.visibilityState === 'visible' && void this.sync()
+    const onOnline = () => void this.sync()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    const interval = setInterval(() => document.visibilityState === 'visible' && void this.sync(), 60_000)
+    this.lastServer = JSON.stringify(this.store.meta.server)
+    void this.sync()
+    return () => {
+      unsubscribe()
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+      clearInterval(interval)
+      clearTimeout(this.timer)
+    }
+  }
+
+  /** Synkar nu. Pågår en synk redan körs en till direkt efteråt. */
+  sync(): Promise<void> {
+    if (this.running) {
+      this.again = true
+      return this.running
+    }
+    this.running = this.run().finally(() => {
+      this.running = undefined
+      if (this.again) {
+        this.again = false
+        void this.sync()
+      }
+    })
+    return this.running
+  }
+
+  private async run() {
+    const settings = this.store.meta.server
+    if (!isConfigured(settings)) return this.setStatus({ state: 'off' })
+    this.setStatus({ state: 'syncing' })
+    try {
+      // Skicka det som ändrats här och ta emot allt nytt från servern, tills båda är ikapp.
+      for (let round = 0; round < 50; round++) {
+        const sent = this.store.dirtyEntries().slice(0, 1000)
+        const res = await call<SyncResponse>(settings, '/sync', {
+          method: 'POST',
+          body: JSON.stringify({
+            databaseId: this.store.meta.databaseId,
+            cursor: this.store.meta.cursor,
+            changes: sent.map(({ key, value, updatedAt, device }) => ({ key, value, updatedAt, device })),
+          }),
+        })
+        const knownBefore = this.store.meta.databaseId
+        this.store.applyRemote(res.changes)
+        this.store.markSynced(sent)
+        this.store.setMeta({ databaseId: res.databaseId, cursor: res.cursor })
+        // En ny eller återställd server: skicka upp allt vi har.
+        if (knownBefore && knownBefore !== res.databaseId) this.store.markAllDirty()
+        if (!res.more && this.store.dirtyEntries().length === 0) break
+      }
+      // Nya recept från nätet, så att leken finns offline.
+      for (let round = 0; round < 50; round++) {
+        const after = Math.max(0, ...[...this.store.recipes.keys()].filter((k) => k.startsWith('web-')).map((k) => Number(k.slice(4))))
+        const res = await call<{ recipes: Card[]; more: boolean }>(settings, `/recipes?after=${after}&limit=500`)
+        this.store.addRecipes(res.recipes.map(toWebRecipe))
+        if (!res.more) break
+      }
+      this.store.setMeta({ lastSyncedAt: Date.now() })
+      this.setStatus({ state: 'ok' })
+    } catch (e) {
+      this.setStatus({ state: 'error', message: e instanceof ApiError ? e.message : 'Synken misslyckades.' })
+    }
+  }
+}
+
+export function useSyncStatus(syncer: Syncer) {
+  return useSyncExternalStore(syncer.subscribe, syncer.getStatus)
+}

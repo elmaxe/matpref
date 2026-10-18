@@ -31,83 +31,103 @@ public sealed class ApiTests : IDisposable
         Directory.Delete(_dir, recursive: true);
     }
 
-    long[] Seed(int count)
+    Db Db => _factory.Services.GetRequiredService<Db>();
+
+    void Seed(int count)
     {
-        var db = _factory.Services.GetRequiredService<Db>();
         for (var i = 0; i < count; i++)
-            db.AddRecipe("Test", new RecipeMeta($"https://x.se/recept/{i}/", $"Rätt {i}", null, null, 30, 4, [], []), i % 2 == 0 ? "fast" : "storkok");
-        return db.Deck("a", 100, null).Cards.Select(c => c.Id).ToArray();
+            Db.AddRecipe("Test", new RecipeMeta($"https://x.se/recept/{i}/", $"Rätt {i}", null, null, 30, 4, [], []), "fast");
     }
 
-    async Task<JsonElement> Get(string url) => await _client.GetFromJsonAsync<JsonElement>(url);
+    static object Change(string key, object? value, long at, string device = "phone-a") => new { key, value, updatedAt = at, device };
 
-    async Task<JsonElement> Swipe(string user, long id, bool liked)
+    async Task<JsonElement> Sync(long cursor, string? databaseId, params object[] changes)
     {
-        var res = await _client.PostAsJsonAsync("/api/swipes", new { user, recipeId = id, liked });
+        var res = await _client.PostAsJsonAsync("/api/sync", new { databaseId, cursor, changes });
         res.EnsureSuccessStatusCode();
         return await res.Content.ReadFromJsonAsync<JsonElement>();
     }
 
-    static long[] Ids(JsonElement deck) => deck.GetProperty("cards").EnumerateArray().Select(c => c.GetProperty("id").GetInt64()).ToArray();
+    static Dictionary<string, string> Values(JsonElement res) =>
+        res.GetProperty("changes").EnumerateArray().ToDictionary(c => c.GetProperty("key").GetString()!, c => c.GetProperty("value").GetRawText());
 
     [Fact]
-    public async Task Both_users_get_the_same_deck_order()
+    public async Task Sync_sends_changes_to_the_other_phone()
     {
-        Seed(10);
-        Assert.Equal(Ids(await Get("/api/deck?user=a")), Ids(await Get("/api/deck?user=b")));
-        var deck = await Get("/api/deck?user=a&category=fast&limit=3");
-        Assert.Equal(3, Ids(deck).Length);
-        Assert.Equal(5, deck.GetProperty("remaining").GetInt32());
+        var a = await Sync(0, null, Change("swipe/a/1", true, 100), Change("name/a", "Axel", 100));
+        var dbId = a.GetProperty("databaseId").GetString();
+        var cursorA = a.GetProperty("cursor").GetInt64();
+
+        var b = await Sync(0, null, Change("swipe/b/1", true, 110, "phone-b"));
+        Assert.Equal(new Dictionary<string, string> { ["swipe/a/1"] = "true", ["name/a"] = "\"Axel\"", ["swipe/b/1"] = "true" }, Values(b));
+
+        // Telefon A får bara det som är nytt sedan sist.
+        var a2 = await Sync(cursorA, dbId);
+        Assert.Equal(new Dictionary<string, string> { ["swipe/b/1"] = "true" }, Values(a2));
+        Assert.Empty(Values(await Sync(a2.GetProperty("cursor").GetInt64(), dbId)));
     }
 
     [Fact]
-    public async Task Partner_likes_come_first_and_partner_nos_are_skipped()
+    public async Task Newest_change_wins_even_if_it_arrives_first()
     {
-        var ids = Seed(6);
-        await Swipe("a", ids[4], true);
-        await Swipe("a", ids[2], false);
-        var deckB = Ids(await Get("/api/deck?user=b"));
-        Assert.Equal(ids[4], deckB[0]);
-        Assert.DoesNotContain(ids[2], deckB);
-        Assert.Equal(5, deckB.Length);
-        Assert.DoesNotContain(ids[4], Ids(await Get("/api/deck?user=a")));
+        await Sync(0, null, Change("favorite/lasagne", true, 200, "phone-b"));
+        // En telefon som varit offline skickar en äldre ändring: den ska inte skriva över.
+        var res = await Sync(0, null, Change("favorite/lasagne", null, 150));
+        Assert.Equal("true", Values(res)["favorite/lasagne"]);
+        res = await Sync(0, null, Change("favorite/lasagne", null, 250));
+        Assert.Equal("null", Values(res)["favorite/lasagne"]);
     }
 
     [Fact]
-    public async Task Two_likes_make_a_match_and_undo_removes_it()
+    public async Task New_database_makes_the_phone_start_over()
     {
-        var ids = Seed(3);
-        Assert.Equal(JsonValueKind.Null, (await Swipe("a", ids[0], true)).GetProperty("match").ValueKind);
-        var res = await Swipe("b", ids[0], true);
-        Assert.Equal(ids[0], res.GetProperty("match").GetProperty("id").GetInt64());
-
-        var matches = await Get("/api/matches");
-        Assert.Equal(1, matches.GetArrayLength());
-        Assert.Equal(ids[0], matches[0].GetProperty("recipe").GetProperty("id").GetInt64());
-
-        (await _client.DeleteAsync($"/api/swipes/b/{ids[0]}")).EnsureSuccessStatusCode();
-        Assert.Equal(0, (await Get("/api/matches")).GetArrayLength());
-        Assert.Contains(ids[0], Ids(await Get("/api/deck?user=b")));
+        var first = await Sync(0, null, Change("rating/a/tacos", "like", 1));
+        var res = await Sync(first.GetProperty("cursor").GetInt64() + 100, "en-annan-databas");
+        Assert.Equal(first.GetProperty("databaseId").GetString(), res.GetProperty("databaseId").GetString());
+        Assert.Equal("\"like\"", Values(res)["rating/a/tacos"]);
     }
 
     [Fact]
-    public async Task Removed_match_does_not_come_back_in_the_deck()
+    public void Sync_pages_large_histories()
     {
-        var ids = Seed(2);
-        await Swipe("a", ids[1], true);
-        await Swipe("b", ids[1], true);
-        Assert.Equal(HttpStatusCode.NoContent, (await _client.DeleteAsync($"/api/matches/{ids[1]}")).StatusCode);
-        Assert.Equal(0, (await Get("/api/matches")).GetArrayLength());
-        Assert.DoesNotContain(ids[1], Ids(await Get("/api/deck?user=a")));
-        Assert.DoesNotContain(ids[1], Ids(await Get("/api/deck?user=b")));
+        var (cursor, changes, more) = Db.Sync(0, Enumerable.Range(0, 5).Select(i =>
+            new Change($"cooked/r{i}", JsonDocument.Parse("\"2026-10-18\"").RootElement, i, "x")), limit: 3);
+        Assert.Equal(3, changes.Length);
+        Assert.True(more);
+        (_, changes, more) = Db.Sync(cursor, [], limit: 3);
+        Assert.Equal(["cooked/r3", "cooked/r4"], changes.Select(c => c.Key));
+        Assert.False(more);
     }
 
     [Fact]
-    public async Task Rejects_bad_input()
+    public async Task Rejects_unknown_keys()
     {
-        Assert.Equal(HttpStatusCode.BadRequest, (await _client.GetAsync("/api/deck?user=c")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await _client.GetAsync("/api/deck?user=a&category=dessert")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await _client.PostAsJsonAsync("/api/swipes", new { user = "a", recipeId = 999, liked = true })).StatusCode);
+        var res = await _client.PostAsJsonAsync("/api/sync", new { cursor = 0, changes = new[] { Change("secret/x", 1, 1) } });
+        Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Lists_recipes_in_pages_with_their_shared_rank()
+    {
+        Seed(5);
+        var page = await _client.GetFromJsonAsync<JsonElement>("/api/recipes?limit=3");
+        var recipes = page.GetProperty("recipes").EnumerateArray().ToArray();
+        Assert.Equal(3, recipes.Length);
+        Assert.True(page.GetProperty("more").GetBoolean());
+        Assert.InRange(recipes[0].GetProperty("rank").GetDouble(), 0, 1);
+        var rest = await _client.GetFromJsonAsync<JsonElement>($"/api/recipes?after={recipes[^1].GetProperty("id").GetInt64()}");
+        Assert.Equal(2, rest.GetProperty("recipes").GetArrayLength());
+        Assert.False(rest.GetProperty("more").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Counts_recipes_someone_has_not_swiped()
+    {
+        Seed(3);
+        var ids = Db.Recipes(0, 10).Recipes.Select(r => r.Id).ToArray();
+        await Sync(0, null, Change($"swipe/a/{ids[0]}", true, 1), Change($"swipe/b/{ids[0]}", false, 1), Change($"swipe/a/{ids[1]}", true, 1),
+            Change($"swipe/b/{ids[2]}", null, 1));
+        Assert.Equal(2, Db.UnswipedCount());
     }
 
     [Fact]
@@ -124,9 +144,9 @@ public sealed class ApiTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         Assert.Equal("https://elmaxe.github.io", res.Headers.GetValues("Access-Control-Allow-Origin").Single());
 
-        var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/deck");
+        var preflight = new HttpRequestMessage(HttpMethod.Options, "/api/sync");
         preflight.Headers.Add("Origin", "https://elmaxe.github.io");
-        preflight.Headers.Add("Access-Control-Request-Method", "GET");
+        preflight.Headers.Add("Access-Control-Request-Method", "POST");
         preflight.Headers.Add("Access-Control-Request-Headers", "x-matpref-token");
         preflight.Headers.Add("Access-Control-Request-Private-Network", "true");
         var pre = await client.SendAsync(preflight);

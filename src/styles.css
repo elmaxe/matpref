@@ -617,3 +617,10 @@ a.link-btn {
     animation: none;
   }
 }
+
+.demo-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 0.9rem;
+}

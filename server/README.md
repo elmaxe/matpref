@@ -1,14 +1,17 @@
 # Matpref-servern
 
-En liten server (ASP.NET Core + SQLite) som gör det möjligt att swipea recept från nätet under *Inspiration* i appen. Swipa höger på det du vill äta; när ni båda har swipat höger på samma rätt blir det en match. Matchningarna sparas på servern och dyker upp i appen bland era recept, så att de kan slumpas, gillas och bli favoriter.
+En liten server (ASP.NET Core + SQLite) som två telefoner synkar mot, och som hämtar recept från nätet att swipea under *Inspiration*.
 
-Resten av appen fungerar som förut utan server.
+Appen är *local first*: allt sparas först i en databas på telefonen (IndexedDB) och fungerar helt offline, även swipen. Servern är en plats att synka till. När telefonen når den skickas ändringarna dit och den andra telefonens ändringar hämtas. Det som synkas är namn, betyg, favoriter, vad ni har lagat, swipes och borttagna matchningar. För varje sak vinner den senaste ändringen, oavsett vilken telefon den gjordes på.
+
+Utan server visar Inspiration en liten lek med exempelrecept, så att ni kan testa swipen på en telefon genom att byta person.
 
 ## Hur leken fungerar
 
 - Servern hämtar recept från **ICA, Arla, Coop och Köket.se**. Den läser sajternas egna sitemaps, väljer slumpvis bland receptsidorna och sparar bara titel, bild, kort beskrivning, tid, antal portioner och länk. Själva receptet läser ni på sajten.
 - Bara middagsmat kommer med: efterrätter, bakning, drycker och tillbehör sorteras bort. Varje rätt får en gissad kategori (Fast, Storkok eller Finmiddag).
-- **Servern bestämmer ordningen**, och den är densamma för er båda. Först kommer rätter den andra redan har sagt ja till (där kan det bli match direkt), sedan resten i en gemensam slumpad ordning. Det den andra har sagt nej till visas inte, eftersom det ändå inte kan bli match.
+- **Servern bestämmer ordningen**: varje recept får en slumpad plats i leken när det importeras, och den är densamma för er båda. Telefonen hämtar recepten och visar dem i den ordningen, men först de rätter den andra redan har sagt ja till (där kan det bli match direkt). Det den andra har sagt nej till visas inte, eftersom det ändå inte kan bli match.
+- **Match** blir det när ni båda har swipat höger. Det märks direkt på telefonen som swipar sist, och på den andra vid nästa synk.
 - Importen kör var 12:e timme men hämtar bara när det finns färre än 150 rätter kvar som någon av er inte har swipat, högst 40 nya per sajt och med en paus mellan varje sida. Den första körningen sker när servern startar och tar upp till tio minuter.
 
 ## Starta på NAS:en
@@ -41,7 +44,7 @@ Med en vanlig WireGuard/OpenVPN-tunnel och bara en IP-adress finns inget certifi
 
 ## Koppla in appen
 
-Under fliken **Vi → Server för swipe**: fyll i adressen, välj vem som använder telefonen och tryck *Testa anslutningen*. Gör samma sak på den andra telefonen och välj den andra personen.
+Under fliken **Vi → Server**: fyll i adressen, välj vem som använder telefonen och tryck *Spara och synka*. Gör samma sak på den andra telefonen och välj den andra personen. Det som redan finns på telefonerna slås ihop.
 
 ## Inställningar
 
@@ -64,11 +67,8 @@ Fler källor läggs till under `Import:Sources` i `appsettings.json`: ett namn, 
 | Anrop | Vad |
 | --- | --- |
 | `GET /api/health` | Antal recept per källa och om en import pågår. |
-| `GET /api/deck?user=a&limit=20&category=fast` | Nästa kort för person `a` eller `b`, plus hur många som är kvar. |
-| `POST /api/swipes` `{ "user": "a", "recipeId": 1, "liked": true }` | Spara en swipe. Svarar med receptet i `match` om det blev match. |
-| `DELETE /api/swipes/{user}/{recipeId}` | Ångra en swipe. |
-| `GET /api/matches` | Era matchningar, senaste först. |
-| `DELETE /api/matches/{recipeId}` | Ta bort en matchning från listan. |
+| `POST /api/sync` `{ "databaseId", "cursor", "changes": [{ "key", "value", "updatedAt", "device" }] }` | Skicka telefonens ändringar och få allt nytt sedan `cursor`. Nycklar: `name/a`, `rating/a/<recept>`, `favorite/<recept>`, `cooked/<recept>`, `swipe/a/<recept>`, `hidden/<recept>`. |
+| `GET /api/recipes?after=<id>&limit=500` | Recept från nätet med id större än `after`, med sin plats (`rank`) i leken. |
 | `POST /api/import` | Kör en import nu. |
 
 ## Utveckling

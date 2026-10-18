@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { CategoryChips, RecipeCard, RecipeList, Segmented, categoryLabel, displayName } from './components'
 import { candidates, isNew, pick } from './random'
 import { newRecipeUrl } from './recipes'
-import type { Server } from './server'
-import { WEB_PREFIX, isConfigured } from './server'
+import type { Syncer } from './server'
+import type { Store } from './store'
 import type { Actions } from './storage'
 import { decodeState, encodeState } from './storage'
 import type { AppState, Category, Filters, PersonId, Recipe, Source, Who } from './types'
@@ -169,19 +169,13 @@ export function FavoritesView({ recipes, state, actions, onRoll }: ViewProps & {
   )
 }
 
-export function InspirationView({ recipes, state, actions, server, onRoll }: ViewProps & { server: Server; onRoll: () => void }) {
-  // Matchningarna visas för sig, så här blir det bara era egna recept.
-  const list = recipes.filter((r) => isNew(r, state) && !r.id.startsWith(WEB_PREFIX))
+export function InspirationView({ recipes, state, actions, store, onRoll }: ViewProps & { store: Store; onRoll: () => void }) {
+  // Matchningarna från nätet visas för sig, så här blir det bara era egna recept.
+  const list = recipes.filter((r) => isNew(r, state) && !r.source)
   return (
     <section>
-      {isConfigured(server.settings) ? (
-        <SwipeDeck server={server} state={state} />
-      ) : (
-        <div className="panel intro">
-          <p>Vill ni swipea recept från nätet och se vad ni båda gillar? Koppla in en server under fliken Vi.</p>
-        </div>
-      )}
-      <Matches server={server} state={state} actions={actions} />
+      <SwipeDeck store={store} state={state} />
+      <Matches store={store} state={state} actions={actions} />
       <h2 className="section-title">Nytt för er</h2>
       <div className="panel intro">
         <p>Rätter som ingen av er har testat eller tyckt till om än. Dags att prova något nytt?</p>
@@ -202,13 +196,13 @@ export function InspirationView({ recipes, state, actions, server, onRoll }: Vie
   )
 }
 
-export function PeopleView({ recipes, state, actions, server }: ViewProps & { server: Server }) {
+export function PeopleView({ recipes, state, actions, store, syncer }: ViewProps & { store: Store; syncer: Syncer }) {
   return (
     <section>
       {PERSON_IDS.map((p) => (
         <PersonPanel key={p} person={p} recipes={recipes} state={state} actions={actions} />
       ))}
-      <ServerPanel server={server} state={state} />
+      <ServerPanel store={store} syncer={syncer} state={state} />
       <SyncPanel state={state} actions={actions} />
     </section>
   )
@@ -283,9 +277,10 @@ function SyncPanel({ state, actions }: { state: AppState; actions: Actions }) {
 
   return (
     <div className="panel">
-      <h3>Synka mellan telefoner</h3>
+      <h3>Dela utan server</h3>
       <p className="meta">
-        Listorna sparas bara på den här enheten. Dela en länk till den andra telefonen och öppna den där, så slås listorna ihop.
+        Utan server finns listorna bara på den här telefonen. Dela en länk till den andra telefonen och öppna den där, så slås
+        listorna ihop.
       </p>
       <button className="primary" onClick={share}>
         Dela mina listor
@@ -301,7 +296,7 @@ function SyncPanel({ state, actions }: { state: AppState; actions: Actions }) {
       <button
         className="danger"
         onClick={() => {
-          if (confirm('Rensa alla listor, favoriter och namn på den här enheten?')) actions.reset()
+          if (confirm('Rensa alla listor, favoriter, swipes och namn på den här enheten? Med server hämtas det som finns där igen.')) actions.reset()
         }}
       >
         Rensa allt på den här enheten

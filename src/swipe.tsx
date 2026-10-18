@@ -1,125 +1,73 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { RecipeCard, Segmented, categoryLabel, displayName } from './components'
-import type { Card, Health, Server } from './server'
-import { ApiError, api, isConfigured, mixedContentProblem, toRecipe } from './server'
+import { demoRecipes } from './demo'
+import type { Health, Syncer } from './server'
+import { ApiError, health, isConfigured, mixedContentProblem, toRecipe, useSyncStatus } from './server'
 import type { Actions } from './storage'
-import type { AppState, Category } from './types'
+import { PREVIEW_LABEL } from './storage'
+import type { Store, WebRecipe } from './store'
+import type { AppState, Category, PersonId } from './types'
 import { CATEGORIES, PERSON_IDS } from './types'
 
-const message = (e: unknown) => (e instanceof ApiError ? e.message : 'Något gick fel.')
+/** Recepten att swipea bland: serverns, eller exempelrecepten om ingen server är inkopplad. */
+export function swipePool(store: Store): WebRecipe[] {
+  return isConfigured(store.meta.server) ? [...store.recipes.values()] : demoRecipes
+}
 
-/** Kortleken från servern. Swipea höger på det du vill äta; gillar ni båda samma rätt blir det en match. */
-export function SwipeDeck({ server, state }: { server: Server; state: AppState }) {
-  const { settings, refreshMatches } = server
+/** Recepten från nätet som matchningar kan komma från. Med server bara serverns, så att båda telefonerna visar samma. */
+export const allWebRecipes = (store: Store) =>
+  isConfigured(store.meta.server) ? [...store.recipes.values()] : [...store.recipes.values(), ...demoRecipes]
+
+/** Kortleken. Swipea höger på det du vill äta; gillar ni båda samma rätt blir det en match. Allt sker lokalt och synkas sedan. */
+export function SwipeDeck({ store, state }: { store: Store; state: AppState }) {
   const [category, setCategory] = useState<Category | 'all'>('all')
-  const [cards, setCards] = useState<Card[]>([])
-  const [remaining, setRemaining] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string>()
-  const [last, setLast] = useState<Card>()
-  const [match, setMatch] = useState<Card>()
+  const [last, setLast] = useState<string>()
+  const [match, setMatch] = useState<WebRecipe>()
   const [dx, setDx] = useState(0)
   const [leaving, setLeaving] = useState<'left' | 'right'>()
   const drag = useRef<{ x: number; id: number }>(undefined)
-  // Kort som är swipade men där servern inte har svarat än, så att de inte kommer tillbaka när leken fylls på.
-  const pending = useRef(new Set<number>())
-  const cardsRef = useRef(cards)
-  cardsRef.current = cards
-  const [stalled, setStalled] = useState(false)
-  const cat = category === 'all' ? undefined : category
+  const demo = !isConfigured(store.meta.server)
+  const me = store.meta.me
+  const other: PersonId = me === 'a' ? 'b' : 'a'
 
-  const load = useCallback(
-    async (replace: boolean) => {
-      setLoading(true)
-      try {
-        const deck = await api.deck(settings, cat)
-        setError(undefined)
-        setRemaining(deck.remaining)
-        const known = new Set(replace ? [] : cardsRef.current.map((c) => c.id))
-        const fresh = deck.cards.filter((c) => !known.has(c.id) && !pending.current.has(c.id))
-        setCards((current) => (replace ? fresh : [...current, ...fresh.filter((c) => !current.some((x) => x.id === c.id))]))
-        // Kom inget nytt är leken slut för stunden. Sluta fylla på tills nästa swipe.
-        setStalled(!replace && fresh.length === 0)
-      } catch (e) {
-        setError(message(e))
-      } finally {
-        setLoading(false)
-      }
-    },
-    [settings, cat],
+  const deck = useMemo(
+    () => store.deck(swipePool(store), category === 'all' ? undefined : category),
+    // store.version ändras vid varje ändring i databasen.
+    [store, store.version, category],
   )
+  const top = deck[0]
 
-  useEffect(() => {
-    setCards([])
-    void load(true)
-  }, [load])
+  const swipe = (r: WebRecipe, liked: boolean) => {
+    setLeaving(undefined)
+    setDx(0)
+    store.swipe(r.id, liked)
+    setLast(r.id)
+    if (liked && store.isMatch(r.id)) setMatch(r)
+  }
 
-  const top = cards[0]
+  const fling = (liked: boolean) => {
+    if (!top || leaving) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return swipe(top, liked)
+    setLeaving(liked ? 'right' : 'left')
+    window.setTimeout(() => swipe(top, liked), 180)
+  }
 
-  const swipe = useCallback(
-    async (card: Card, liked: boolean) => {
-      setLeaving(undefined)
-      setDx(0)
-      setStalled(false)
-      setCards((cs) => cs.filter((c) => c.id !== card.id))
-      setRemaining((r) => Math.max(0, r - 1))
-      pending.current.add(card.id)
-      try {
-        const res = await api.swipe(settings, card.id, liked)
-        setLast(card)
-        setError(undefined)
-        if (res.match) {
-          setMatch(res.match)
-          void refreshMatches()
-        }
-      } catch (e) {
-        // Lägg tillbaka kortet så att swipen inte försvinner tyst.
-        setCards((cs) => [card, ...cs.filter((c) => c.id !== card.id)])
-        setRemaining((r) => r + 1)
-        setError(message(e))
-      } finally {
-        pending.current.delete(card.id)
-      }
-    },
-    [settings, refreshMatches],
-  )
-
-  // Fyll på i förväg så att det alltid finns kort.
-  useEffect(() => {
-    if (!loading && !error && !stalled && cards.length < 5 && remaining > cards.length) void load(false)
-  }, [cards.length, remaining, loading, error, stalled, load])
-
-  const fling = useCallback(
-    (liked: boolean) => {
-      if (!top || leaving) return
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return void swipe(top, liked)
-      setLeaving(liked ? 'right' : 'left')
-      window.setTimeout(() => void swipe(top, liked), 180)
-    },
-    [top, leaving, swipe],
-  )
-
+  const flingRef = useRef(fling)
+  flingRef.current = fling
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || match) return
-      if (e.key === 'ArrowLeft') fling(false)
-      if (e.key === 'ArrowRight') fling(true)
+      if (e.key === 'ArrowLeft') flingRef.current(false)
+      if (e.key === 'ArrowRight') flingRef.current(true)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [fling, match])
+  }, [match])
 
-  const undo = async () => {
+  const undo = () => {
     if (!last) return
-    try {
-      await api.undo(settings, last.id)
-      setCards((cs) => [last, ...cs.filter((c) => c.id !== last.id)])
-      setRemaining((r) => r + 1)
-      setLast(undefined)
-      void refreshMatches()
-    } catch (e) {
-      setError(message(e))
-    }
+    store.swipe(last, null)
+    setLast(undefined)
   }
 
   const categoryOptions: { id: Category | 'all'; label: string }[] = [
@@ -130,14 +78,19 @@ export function SwipeDeck({ server, state }: { server: Server; state: AppState }
 
   return (
     <div className="panel swipe">
-      <Segmented label={`Swipea som ${displayName(state, settings.me)}`} options={categoryOptions} value={category} onChange={setCategory} />
-
-      {error && (
-        <div className="swipe-error">
-          <p>{error}</p>
-          <button onClick={() => void load(cards.length === 0)}>Försök igen</button>
-        </div>
+      {demo && (
+        <p className="demo-note">
+          Ingen server inkopplad, så här är exempelrecept att testa med. Byt till {displayName(state, other)} nedan för att swipea som
+          den andra och se en match. Koppla in en server under Vi för riktiga recept och synk mellan telefonerna.
+        </p>
       )}
+      <Segmented
+        label="Vem swipar?"
+        options={PERSON_IDS.map((p) => ({ id: p, label: displayName(state, p) }))}
+        value={me}
+        onChange={(p) => store.setMeta({ me: p })}
+      />
+      <Segmented label="Vad blir det?" options={categoryOptions} value={category} onChange={setCategory} />
 
       {top ? (
         <article
@@ -187,11 +140,13 @@ export function SwipeDeck({ server, state }: { server: Server; state: AppState }
           </div>
         </article>
       ) : (
-        !error && (
-          <p className="empty">
-            {loading ? 'Hämtar recept…' : 'Slut på recept just nu. Servern hämtar fler av sig själv, titta in igen senare.'}
-          </p>
-        )
+        <p className="empty">
+          {demo
+            ? `Slut på exempelrecept för ${displayName(state, me)}.`
+            : store.recipes.size === 0
+              ? 'Inga recept från servern än. De hämtas vid nästa synk.'
+              : 'Slut på recept just nu. Servern hämtar fler av sig själv, titta in igen senare.'}
+        </p>
       )}
 
       <div className="swipe-actions">
@@ -205,7 +160,7 @@ export function SwipeDeck({ server, state }: { server: Server; state: AppState }
           ♥
         </button>
       </div>
-      {top && <p className="meta center">{remaining} kvar att swipea</p>}
+      {top && <p className="meta center">{deck.length} kvar att swipea</p>}
 
       {match && (
         <div className="match-overlay" role="dialog" aria-modal="true" aria-label="Det blev match">
@@ -227,32 +182,21 @@ export function SwipeDeck({ server, state }: { server: Server; state: AppState }
 }
 
 /** Recepten ni båda har swipat höger på. */
-export function Matches({ server, state, actions }: { server: Server; state: AppState; actions: Actions }) {
-  const [error, setError] = useState<string>()
-  if (server.matches.length === 0) return null
+export function Matches({ store, state, actions }: { store: Store; state: AppState; actions: Actions }) {
+  const matches = store.matches(allWebRecipes(store))
+  if (matches.length === 0) return null
   return (
     <>
-      <h2 className="section-title">Era matchningar ({server.matches.length})</h2>
-      {error && <p className="meta">{error}</p>}
+      <h2 className="section-title">Era matchningar ({matches.length})</h2>
       <div className="list">
-        {server.matches.map((m) => (
+        {matches.map((r) => (
           <RecipeCard
-            key={m.recipe.id}
-            recipe={toRecipe(m.recipe)}
+            key={r.id}
+            recipe={toRecipe(r)}
             state={state}
             actions={actions}
             extra={
-              <button
-                className="link-btn muted"
-                onClick={async () => {
-                  try {
-                    await server.removeMatch(m.recipe.id)
-                    setError(undefined)
-                  } catch (e) {
-                    setError(message(e))
-                  }
-                }}
-              >
+              <button className="link-btn muted" onClick={() => store.hideMatch(r.id)}>
                 Ta bort från matchningar
               </button>
             }
@@ -263,37 +207,44 @@ export function Matches({ server, state, actions }: { server: Server; state: App
   )
 }
 
-/** Inställningar för servern, under fliken Vi. */
-export function ServerPanel({ server, state }: { server: Server; state: AppState }) {
-  const { settings, setSettings } = server
-  const [status, setStatus] = useState<string>()
-  const [testing, setTesting] = useState(false)
-  const problem = settings.url.trim() ? mixedContentProblem(settings.url) : undefined
+const time = (ms: number) =>
+  new Date(ms).toLocaleString('sv-SE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
 
-  const test = async () => {
-    setTesting(true)
+/** Inställningar och status för servern, under fliken Vi. */
+export function ServerPanel({ store, syncer, state }: { store: Store; syncer: Syncer; state: AppState }) {
+  const status = useSyncStatus(syncer)
+  const [url, setUrl] = useState(store.meta.server.url)
+  const [token, setToken] = useState(store.meta.server.token)
+  const [info, setInfo] = useState<string>()
+  const problem = url.trim() ? mixedContentProblem(url) : undefined
+  const saved = store.meta.server
+  const changed = url.trim() !== saved.url || token !== saved.token
+  const pending = store.dirtyEntries().length
+
+  const save = async () => {
+    store.setMeta({ server: { url: url.trim(), token } })
+    setInfo(undefined)
+    if (!url.trim()) return
+    await syncer.sync()
     try {
-      const h: Health = await api.health(settings)
+      const h: Health = await health(store.meta.server)
       const counts = Object.entries(h.recipes)
       const total = counts.reduce((sum, [, n]) => sum + n, 0)
-      setStatus(
-        `Ansluten! ${total} recept${counts.length ? ` (${counts.map(([s, n]) => `${s} ${n}`).join(', ')})` : ''}.` +
-          (h.importing ? ' Hämtar fler just nu.' : ''),
+      setInfo(
+        `Servern har ${total} recept${counts.length ? ` (${counts.map(([s, n]) => `${s} ${n}`).join(', ')})` : ''}.` +
+          (h.importing ? ' Den hämtar fler just nu.' : ''),
       )
-      void server.refreshMatches()
     } catch (e) {
-      setStatus(message(e))
-    } finally {
-      setTesting(false)
+      if (!(e instanceof ApiError)) throw e
     }
   }
 
   return (
     <div className="panel">
-      <h3>Server för swipe</h3>
+      <h3>Server</h3>
       <p className="meta">
-        Med en egen server kan ni swipea recept från ICA, Arla, Coop och Köket.se under Inspiration. Rätter ni båda gillar sparas som
-        matchningar. Se <code>server/</code> i repot för hur den sätts upp.
+        Allt sparas på telefonen och fungerar offline. Med en egen server synkas era listor, favoriter och swipes mellan
+        telefonerna, och ni får recept från ICA, Arla, Coop och Köket.se att swipea. Se <code>server/</code> i repot.
       </p>
       <label className="field">
         <span className="field-label">Adress</span>
@@ -302,26 +253,41 @@ export function ServerPanel({ server, state }: { server: Server; state: AppState
           inputMode="url"
           autoCapitalize="off"
           autoCorrect="off"
-          placeholder="https://nas.exempel.ts.net"
-          value={settings.url}
-          onChange={(e) => setSettings({ ...settings, url: e.target.value })}
+          placeholder="https://matpref.ert-tailnet.ts.net"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
         />
       </label>
       {problem && <p className="meta warn">{problem}</p>}
+      {PREVIEW_LABEL && (
+        <p className="meta warn">Det här är en förhandsvisning. Kopplar du in samma server som i den riktiga appen delar de data.</p>
+      )}
       <label className="field">
         <span className="field-label">Nyckel (om servern har en)</span>
-        <input type="password" value={settings.token} onChange={(e) => setSettings({ ...settings, token: e.target.value })} />
+        <input type="password" value={token} onChange={(e) => setToken(e.target.value)} />
       </label>
       <Segmented
         label="Vem använder den här telefonen?"
         options={PERSON_IDS.map((p) => ({ id: p, label: displayName(state, p) }))}
-        value={settings.me}
-        onChange={(me) => setSettings({ ...settings, me })}
+        value={store.meta.me}
+        onChange={(me) => store.setMeta({ me })}
       />
-      <button onClick={test} disabled={!isConfigured(settings) || testing}>
-        {testing ? 'Testar…' : 'Testa anslutningen'}
+      <button className={changed ? 'primary' : ''} onClick={save} disabled={!changed && (!isConfigured(saved) || status.state === 'syncing')}>
+        {changed ? (url.trim() ? 'Spara och synka' : 'Koppla från servern') : 'Synka nu'}
       </button>
-      {status && <p className="meta">{status}</p>}
+      {isConfigured(saved) && (
+        <p className="meta" aria-live="polite">
+          {status.state === 'syncing'
+            ? 'Synkar…'
+            : status.state === 'error'
+              ? `${status.message} Ändringar sparas på telefonen och synkas när servern går att nå.`
+              : store.meta.lastSyncedAt
+                ? `Synkad ${time(store.meta.lastSyncedAt)}.`
+                : 'Inte synkad än.'}
+          {pending > 0 && status.state !== 'syncing' && ` ${pending} ${pending === 1 ? 'ändring väntar' : 'ändringar väntar'} på att synkas.`}
+        </p>
+      )}
+      {info && <p className="meta">{info}</p>}
     </div>
   )
 }
