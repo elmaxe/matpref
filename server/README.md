@@ -16,7 +16,7 @@ Utan server visar Inspiration en liten lek med exempelrecept, så att ni kan tes
 
 ## Starta på NAS:en
 
-Kör ni Tailscale, hoppa till [nästa avsnitt](#appen-behöver-en-https-adress) och använd `docker-compose.tailscale.yml`. Annars: kopiera [`docker-compose.yml`](docker-compose.yml) till NAS:en och kör:
+Kör ni TrueNAS, se [TrueNAS SCALE](#truenas-scale) nedan. Kör ni Tailscale utan egen reverse proxy, se [https-avsnittet](#appen-behöver-en-https-adress) och använd `docker-compose.tailscale.yml`. Annars: kopiera [`docker-compose.yml`](docker-compose.yml) till NAS:en och kör:
 
 ```sh
 docker compose up -d
@@ -25,6 +25,34 @@ docker compose up -d
 Imagen `ghcr.io/elmaxe/matpref-server` byggs för både x64 och arm64 av GitHub Actions vid varje ändring i `server/` på `main`. Vill du hellre bygga själv: byt `image:` mot `build: .` och kör i den här mappen.
 
 Databasen ligger i volymen `matpref-data` (`/data/matpref.db` i containern). Kolla att det går: `curl http://<nas>:8080/api/health`.
+
+### TrueNAS SCALE
+
+TrueNAS SCALE 24.10 (Electric Eel) och senare kör appar med Docker och kan installera en egen compose-fil.
+
+1. Skapa ett dataset för databasen, t.ex. `tank/apps/matpref` (*Datasets → Add Dataset*, välj förinställningen *Apps*). Ägaren ska vara användaren `apps` (568), som containern körs som.
+2. Gå till *Apps → Discover Apps*, öppna menyn ⋮ uppe till höger och välj *Install via YAML*. Döp appen till `matpref` och klistra in:
+   ```yaml
+   services:
+     matpref:
+       image: ghcr.io/elmaxe/matpref-server:latest
+       restart: unless-stopped
+       # TrueNAS användare "apps", så att den kan skriva i datasetet.
+       user: "568:568"
+       ports:
+         # Vänster sida är porten på NAS:en. Byt om 8080 redan används.
+         - "8080:8080"
+       volumes:
+         # Byt mot sökvägen till ditt dataset.
+         - /mnt/tank/apps/matpref:/data
+       environment:
+         TZ: Europe/Stockholm
+         Matpref__Token: ""
+         Matpref__AllowedOrigins__0: "https://elmaxe.github.io"
+   ```
+3. Peka din reverse proxy (t.ex. nginx) på `http://<nas>:8080` och lägg inte till egna CORS-headers där, det sköter servern. Kolla med `curl https://<din-adress>/api/health`.
+
+Imagen läggs upp på GitHub när PR:en är mergad. Om TrueNAS inte får hämta den (fel om `denied` eller `unauthorized`), gör paketet publikt på GitHub: *Packages → matpref-server → Package settings → Change visibility*.
 
 ## Appen behöver en https-adress
 
