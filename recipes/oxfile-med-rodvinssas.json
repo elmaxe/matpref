@@ -1,0 +1,25 @@
+{
+  "name": "Oxfilé med rödvinssås",
+  "category": "finmiddag",
+  "description": "Rosastekt oxfilé med potatisgratäng och rödvinssås.",
+  "timeMinutes": 90,
+  "servings": 4,
+  "tags": [
+    "kött",
+    "fest"
+  ],
+  "ingredients": [
+    "800 g oxfilé",
+    "Potatis, grädde och vitlök till gratäng",
+    "2 schalottenlökar",
+    "3 dl rödvin",
+    "3 dl kalvfond",
+    "Smör"
+  ],
+  "steps": [
+    "Gör potatisgratängen och sätt in i ugnen.",
+    "Bryn filén och stek i 125 °C till 56 °C innertemperatur.",
+    "Fräs schalotten, koka ner vin och fond till hälften och montera med smör.",
+    "Låt köttet vila innan det skivas."
+  ]
+}

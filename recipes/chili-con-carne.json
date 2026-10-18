@@ -1,0 +1,27 @@
+{
+  "name": "Chili con carne",
+  "category": "storkok",
+  "description": "Het gryta med bönor, perfekt att storkoka.",
+  "timeMinutes": 90,
+  "servings": 8,
+  "tags": [
+    "kött",
+    "frys"
+  ],
+  "ingredients": [
+    "1 kg nötfärs eller högrev",
+    "2 lökar",
+    "3 vitlöksklyftor",
+    "2 burkar krossade tomater",
+    "2 burkar kidneybönor",
+    "2 tsk spiskummin",
+    "Chili efter smak",
+    "1 bit mörk choklad"
+  ],
+  "steps": [
+    "Fräs lök och vitlök med kryddorna.",
+    "Bryn köttet.",
+    "Tillsätt tomater och bönor och låt sjuda 1–2 timmar.",
+    "Rör ner chokladen på slutet."
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "Hemgjord pizza",
+  "category": "finmiddag",
+  "description": "Surdeg eller snabbdeg, toppa med det ni gillar.",
+  "timeMinutes": 120,
+  "servings": 4,
+  "tags": [
+    "fredag",
+    "vegetariskt"
+  ],
+  "ingredients": [
+    "6 dl vetemjöl",
+    "25 g jäst",
+    "3 dl vatten",
+    "Tomatsås",
+    "Mozzarella",
+    "Valfria toppingar"
+  ],
+  "steps": [
+    "Gör en deg och låt jäsa en timme.",
+    "Sätt ugnen på max.",
+    "Kavla ut, toppa och grädda på plåt eller sten ca 8 minuter."
+  ]
+}

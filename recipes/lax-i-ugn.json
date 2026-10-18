@@ -1,0 +1,23 @@
+{
+  "name": "Ugnsbakad lax med citron",
+  "category": "fast",
+  "description": "Lax i ugn med potatis och kall sås.",
+  "timeMinutes": 30,
+  "servings": 2,
+  "tags": [
+    "fisk"
+  ],
+  "ingredients": [
+    "2 laxfiléer",
+    "Citron",
+    "Färskpotatis eller kokt potatis",
+    "Dill",
+    "Kesella eller crème fraiche till såsen"
+  ],
+  "steps": [
+    "Sätt ugnen på 200 °C.",
+    "Lägg laxen i en form med citronskivor, salt och peppar.",
+    "Baka i ca 15 minuter.",
+    "Rör ihop en sås av crème fraiche, dill och citron."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "Ärtsoppa",
+  "category": "storkok",
+  "description": "Torsdagstradition. Gärna med pannkakor efteråt.",
+  "timeMinutes": 150,
+  "servings": 8,
+  "tags": [
+    "husman",
+    "soppa"
+  ],
+  "ingredients": [
+    "1 kg torkade gula ärtor",
+    "1 rimmat fläsklägg eller sidfläsk",
+    "2 lökar",
+    "Timjan och mejram",
+    "Senap till servering"
+  ],
+  "steps": [
+    "Blötlägg ärtorna över natten.",
+    "Koka ärtorna med fläsk och lök i ca 2 timmar. Skumma av.",
+    "Smaka av med timjan och mejram."
+  ]
+}

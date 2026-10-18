@@ -1,0 +1,26 @@
+{
+  "name": "Wok med kyckling och grönsaker",
+  "category": "fast",
+  "description": "Snabb wok med soja, ingefära och knapriga grönsaker.",
+  "timeMinutes": 25,
+  "servings": 2,
+  "tags": [
+    "kyckling",
+    "asiatiskt"
+  ],
+  "ingredients": [
+    "300 g kycklingfilé",
+    "1 påse wokgrönsaker",
+    "2 msk soja",
+    "1 msk ostronsås",
+    "1 bit ingefära",
+    "1 vitlöksklyfta",
+    "Ris eller nudlar"
+  ],
+  "steps": [
+    "Koka ris eller nudlar.",
+    "Skär kycklingen i strimlor och woka på hög värme.",
+    "Tillsätt grönsaker, riven ingefära och vitlök.",
+    "Smaka av med soja och ostronsås."
+  ]
+}

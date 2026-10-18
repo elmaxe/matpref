@@ -1,0 +1,27 @@
+{
+  "name": "Pasta med havskräftor",
+  "category": "finmiddag",
+  "description": "Lyxig pasta med skaldjur, vitt vin och tomat.",
+  "timeMinutes": 40,
+  "servings": 4,
+  "tags": [
+    "fisk",
+    "skaldjur",
+    "pasta"
+  ],
+  "ingredients": [
+    "500 g linguine",
+    "1 kg havskräftor eller räkor",
+    "3 vitlöksklyftor",
+    "2 dl vitt vin",
+    "1 burk körsbärstomater",
+    "Persilja",
+    "Chili"
+  ],
+  "steps": [
+    "Koka pastan.",
+    "Fräs vitlök och chili i olivolja, tillsätt skaldjuren.",
+    "Slå på vinet och tomaterna och låt koka några minuter.",
+    "Vänd ner pastan och persilja."
+  ]
+}

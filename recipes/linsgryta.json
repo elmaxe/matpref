@@ -1,0 +1,27 @@
+{
+  "name": "Röd linsgryta",
+  "category": "storkok",
+  "description": "Billig och värmande vegetarisk gryta med kokos.",
+  "timeMinutes": 45,
+  "servings": 6,
+  "tags": [
+    "vegetariskt",
+    "frys"
+  ],
+  "ingredients": [
+    "4 dl röda linser",
+    "2 lökar",
+    "3 vitlöksklyftor",
+    "1 bit ingefära",
+    "2 msk curry",
+    "1 burk krossade tomater",
+    "1 burk kokosmjölk",
+    "1 l grönsaksbuljong"
+  ],
+  "steps": [
+    "Fräs lök, vitlök, ingefära och curry.",
+    "Tillsätt linser, tomater, kokosmjölk och buljong.",
+    "Koka ca 20 minuter tills linserna är mjuka.",
+    "Servera med ris och yoghurt."
+  ]
+}

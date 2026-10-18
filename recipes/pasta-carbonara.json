@@ -1,0 +1,23 @@
+{
+  "name": "Pasta carbonara",
+  "category": "fast",
+  "description": "Krämig klassiker med ägg, pecorino och sidfläsk.",
+  "timeMinutes": 20,
+  "servings": 2,
+  "tags": [
+    "pasta"
+  ],
+  "ingredients": [
+    "250 g spaghetti",
+    "100 g guanciale eller sidfläsk",
+    "2 ägg + 1 äggula",
+    "50 g riven pecorino eller parmesan",
+    "Svartpeppar"
+  ],
+  "steps": [
+    "Koka pastan i saltat vatten.",
+    "Stek fläsket knaprigt i en stekpanna.",
+    "Vispa ihop ägg, ost och rikligt med peppar.",
+    "Blanda het pasta med fläsket, dra av från värmen och rör ner äggblandningen med lite pastavatten."
+  ]
+}
