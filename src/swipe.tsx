@@ -23,9 +23,9 @@ export function SwipeDeck({ store, state }: { store: Store; state: AppState }) {
   const [category, setCategory] = useState<Category | 'all'>('all')
   const [last, setLast] = useState<string>()
   const [match, setMatch] = useState<WebRecipe>()
-  const [dx, setDx] = useState(0)
-  const [leaving, setLeaving] = useState<'left' | 'right'>()
-  const drag = useRef<{ x: number; id: number }>(undefined)
+  const card = useRef<HTMLElement>(null)
+  const drag = useRef<{ x: number; dx: number; id: number }>(undefined)
+  const leaving = useRef(false)
   const demo = !isConfigured(store.meta.server)
   const me = store.meta.me
   const other: PersonId = me === 'a' ? 'b' : 'a'
@@ -37,18 +37,35 @@ export function SwipeDeck({ store, state }: { store: Store; state: AppState }) {
   )
   const top = deck[0]
 
+  // Bilderna på korten efter nästa laddas i förväg. Nästa kort ligger redan under det översta, så det har sin bild klar
+  // när det översta swipas bort.
+  useEffect(() => {
+    for (const r of deck.slice(2, 5)) if (r.image) preload(r.image)
+  }, [deck])
+
+  /**
+   * Flyttar det översta kortet direkt i DOM:en, inte via React, så att dragningen inte ritar om hela sidan vid varje
+   * rörelse. Utan animate följer kortet fingret, med animate glider det dit.
+   */
+  const move = (dx: number, animate: boolean) => {
+    const el = card.current
+    if (!el) return
+    el.classList.toggle('dragging', !animate)
+    el.style.setProperty('--dx', String(dx))
+  }
+
   const swipe = (r: WebRecipe, liked: boolean) => {
-    setLeaving(undefined)
-    setDx(0)
+    leaving.current = false
     store.swipe(r.id, liked)
     setLast(r.id)
     if (liked && store.isMatch(r.id)) setMatch(r)
   }
 
   const fling = (liked: boolean) => {
-    if (!top || leaving) return
+    if (!top || leaving.current) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return swipe(top, liked)
-    setLeaving(liked ? 'right' : 'left')
+    leaving.current = true
+    move(liked ? 600 : -600, true)
     window.setTimeout(() => swipe(top, liked), 180)
   }
 
@@ -74,7 +91,6 @@ export function SwipeDeck({ store, state }: { store: Store; state: AppState }) {
     { id: 'all', label: 'Alla' },
     ...CATEGORIES.map((c) => ({ id: c.id, label: c.label })),
   ]
-  const offset = leaving === 'right' ? 600 : leaving === 'left' ? -600 : dx
 
   return (
     <div className="panel swipe">
@@ -98,52 +114,47 @@ export function SwipeDeck({ store, state }: { store: Store; state: AppState }) {
       <Segmented label="Vad blir det?" options={categoryOptions} value={category} onChange={setCategory} />
 
       {top ? (
-        <article
-          key={top.id}
-          className={`swipe-card${drag.current ? ' dragging' : ''}`}
-          style={{ transform: `translateX(${offset}px) rotate(${offset / 20}deg)` }}
-          onPointerDown={(e) => {
-            if ((e.target as HTMLElement).closest('a, button')) return
-            drag.current = { x: e.clientX, id: e.pointerId }
-            e.currentTarget.setPointerCapture(e.pointerId)
-          }}
-          onPointerMove={(e) => drag.current?.id === e.pointerId && setDx(e.clientX - drag.current.x)}
-          onPointerUp={() => {
-            drag.current = undefined
-            if (Math.abs(dx) > 100) fling(dx > 0)
-            else setDx(0)
-          }}
-          onPointerCancel={() => {
-            drag.current = undefined
-            setDx(0)
-          }}
-        >
-          <span className="stamp yes" style={{ opacity: Math.max(0, offset / 100) }}>
-            Ja!
-          </span>
-          <span className="stamp no" style={{ opacity: Math.max(0, -offset / 100) }}>
-            Nej
-          </span>
-          {top.image ? (
-            <img src={top.image} alt="" referrerPolicy="no-referrer" draggable={false} />
-          ) : (
-            <div className="swipe-noimg" aria-hidden>
-              🍽
-            </div>
+        // Det översta kortet och nästa ligger på varandra. Swipas det översta bort blir nästa det översta, med samma
+        // element och bild, så att inget behöver laddas eller ritas om från början.
+        <div className="swipe-stack">
+          {deck.slice(0, 2).map((r, i) =>
+            i === 0 ? (
+              <article
+                key={r.id}
+                ref={card}
+                className="swipe-card"
+                onPointerDown={(e) => {
+                  if (leaving.current || (e.target as HTMLElement).closest('a, button')) return
+                  drag.current = { x: e.clientX, dx: 0, id: e.pointerId }
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                }}
+                onPointerMove={(e) => {
+                  const d = drag.current
+                  if (d?.id !== e.pointerId) return
+                  d.dx = e.clientX - d.x
+                  move(d.dx, false)
+                }}
+                onPointerUp={() => {
+                  const d = drag.current
+                  drag.current = undefined
+                  if (!d) return
+                  if (Math.abs(d.dx) > 100) fling(d.dx > 0)
+                  else move(0, true)
+                }}
+                onPointerCancel={() => {
+                  drag.current = undefined
+                  move(0, true)
+                }}
+              >
+                <SwipeCardContent recipe={r} />
+              </article>
+            ) : (
+              <article key={r.id} className="swipe-card next" aria-hidden inert>
+                <SwipeCardContent recipe={r} />
+              </article>
+            ),
           )}
-          <div className="swipe-body">
-            <div>
-              <span className={`badge cat-${top.category}`}>{categoryLabel(top.category)}</span>
-              {top.totalMinutes && <span className="meta">⏱ {top.totalMinutes} min</span>}
-              <span className="meta">{top.source}</span>
-            </div>
-            <h3>{top.title}</h3>
-            {top.description && <p className="desc clamp">{top.description}</p>}
-            <a href={top.url} target="_blank" rel="noreferrer">
-              Visa receptet på {top.source} ↗
-            </a>
-          </div>
-        </article>
+        </div>
       ) : (
         <p className="empty">
           {demo
@@ -183,6 +194,45 @@ export function SwipeDeck({ store, state }: { store: Store; state: AppState }) {
         </div>
       )}
     </div>
+  )
+}
+
+const preloaded = new Set<string>()
+
+/** Hämtar en bild till webbläsarens cache innan den behövs. */
+function preload(src: string) {
+  if (preloaded.has(src)) return
+  preloaded.add(src)
+  const img = new Image()
+  img.referrerPolicy = 'no-referrer'
+  img.src = src
+}
+
+function SwipeCardContent({ recipe: r }: { recipe: WebRecipe }) {
+  return (
+    <>
+      <span className="stamp yes">Ja!</span>
+      <span className="stamp no">Nej</span>
+      {r.image ? (
+        <img src={r.image} alt="" referrerPolicy="no-referrer" draggable={false} />
+      ) : (
+        <div className="swipe-noimg" aria-hidden>
+          🍽
+        </div>
+      )}
+      <div className="swipe-body">
+        <div>
+          <span className={`badge cat-${r.category}`}>{categoryLabel(r.category)}</span>
+          {r.totalMinutes && <span className="meta">⏱ {r.totalMinutes} min</span>}
+          <span className="meta">{r.source}</span>
+        </div>
+        <h3>{r.title}</h3>
+        {r.description && <p className="desc clamp">{r.description}</p>}
+        <a href={r.url} target="_blank" rel="noreferrer">
+          Visa receptet på {r.source} ↗
+        </a>
+      </div>
+    </>
   )
 }
 

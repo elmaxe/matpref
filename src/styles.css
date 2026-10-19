@@ -575,8 +575,19 @@ a.link-btn {
   overflow: hidden;
 }
 
+/* Det översta kortet och nästa ligger i samma ruta, det översta överst. */
+.swipe-stack {
+  display: grid;
+}
+
+.swipe-stack > .swipe-card {
+  grid-area: 1 / 1;
+}
+
 .swipe-card {
+  --dx: 0;
   position: relative;
+  z-index: 1;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -584,13 +595,22 @@ a.link-btn {
   touch-action: pan-y;
   user-select: none;
   cursor: grab;
+  /* --dx sätts av swipe.tsx medan kortet dras eller swipas bort. */
+  transform: translateX(calc(var(--dx) * 1px)) rotate(calc(var(--dx) * 0.05deg));
   transition: transform 0.18s ease-out;
+  will-change: transform;
   box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
 }
 
 .swipe-card.dragging {
   transition: none;
   cursor: grabbing;
+}
+
+.swipe-card.next {
+  z-index: 0;
+  transform: scale(0.96);
+  pointer-events: none;
 }
 
 .swipe-card img,
@@ -645,12 +665,14 @@ a.link-btn {
 
 .stamp.yes {
   left: 18px;
+  opacity: clamp(0, var(--dx) / 100, 1);
   color: var(--fast);
   transform: rotate(-12deg);
 }
 
 .stamp.no {
   right: 18px;
+  opacity: clamp(0, var(--dx) / -100, 1);
   color: var(--danger);
   transform: rotate(12deg);
 }
